@@ -10,11 +10,37 @@ A backend service for automating time and materials accounting using Google Shee
 - uvicorn 0.29.0+
 
 ## Project Structure
-- `/src/core/` - Core components (configuration, utilities)
-- `/src/api/` - REST API endpoints
-- `/src/services/` - Services for working with Google Sheets API
-- `/src/models/` - Data models
+- `/src/feptm/` - Main package
+  - `/src/feptm/core/` - Core components (configuration, utilities)
+  - `/src/feptm/api/` - REST API endpoints
+  - `/src/feptm/services/` - Services for working with Google Sheets API
+  - `/src/feptm/models/` - Data models
+- `/bin/` - Executable scripts
 - `/tests/` - Unit tests
 
 ## Setup and Installation
-Instructions will be added during development.
+1. Create a virtual environment:
+   ```
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .\.venv\Scripts\activate
+   ```
+
+2. Install dependencies:
+   ```
+   pip install -e .
+   ```
+
+3. For development, install dev dependencies:
+   ```
+   pip install -e ".[dev]"
+   ```
+
+## Running the Application
+```
+./bin/run_api.py
+```
+
+Or using Python directly:
+```
+python -m bin.run_api
+```
