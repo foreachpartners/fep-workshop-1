@@ -1,0 +1,88 @@
+[
+  {
+    "id": "a47bc10b-58cc-4372-a567-0e02b2c3d123",
+    "name": "E-Commerce Platform",
+    "description": "Разработка интернет-магазина с интеграцией платежных систем",
+    "client_name": "ООО Ритейл Плюс",
+    "client_contact_email": "contact@retail-plus.com",
+    "client_contact_phone": "+79001234567",
+    "status": "Active",
+    "project_type": "Time and Materials",
+    "timesheet_id": "1ZRXVYuJEStH4SFzDh78DcwTr90FG3gHJKL",
+    "start_date": "2023-03-01T00:00:00Z",
+    "end_date": "2023-12-31T00:00:00Z",
+    "budget": 1500000.0,
+    "repository_url": "https://github.com/retail-plus/ecommerce",
+    "created_at": "2023-02-15T12:00:00Z",
+    "updated_at": "2023-06-20T15:30:00Z",
+    "specialist_ids": [
+      "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "b17dc20a-47dd-5461-b678-1f13a3d2e568",
+      "c28ed31b-69ee-6572-c789-2g24b3e4f657"
+    ]
+  },
+  {
+    "id": "g72hi33d-91jj-9805-f012-5j57e6h7i980",
+    "name": "CRM System",
+    "description": "Разработка системы управления взаимоотношениями с клиентами",
+    "client_name": "АО ФинТех",
+    "client_contact_email": "info@fintech.com",
+    "client_contact_phone": "+79009876543",
+    "status": "Planning",
+    "project_type": "Fixed Price",
+    "timesheet_id": null,
+    "start_date": "2023-08-01T00:00:00Z",
+    "end_date": "2024-01-31T00:00:00Z",
+    "budget": 800000.0,
+    "repository_url": null,
+    "created_at": "2023-07-15T09:00:00Z",
+    "updated_at": "2023-07-15T09:00:00Z",
+    "specialist_ids": [
+      "c28ed31b-69ee-6572-c789-2g24b3e4f657",
+      "d39fe42c-70ff-7683-d890-3h35c4f5g768"
+    ]
+  },
+  {
+    "id": "h83ij44e-02kk-0916-g123-6k68f7i8j091",
+    "name": "Mobile App Development",
+    "description": "Разработка мобильного приложения для доставки еды",
+    "client_name": "ИП Доставкин",
+    "client_contact_email": "contact@dostavkin.ru",
+    "client_contact_phone": "+79001112233",
+    "status": "On Hold",
+    "project_type": "Time and Materials",
+    "timesheet_id": "2ABCDEfgHIjkLMnoPQrst-UvWXYz09876543",
+    "start_date": "2023-04-15T00:00:00Z",
+    "end_date": null,
+    "budget": 1200000.0,
+    "repository_url": "https://github.com/dostavkin/food-delivery-app",
+    "created_at": "2023-03-20T11:00:00Z",
+    "updated_at": "2023-05-10T14:45:00Z",
+    "specialist_ids": [
+      "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "d39fe42c-70ff-7683-d890-3h35c4f5g768",
+      "e40gf53d-81gg-8794-e901-4i46d5g6h879"
+    ]
+  },
+  {
+    "id": "i94jk55f-13ll-1027-h234-7l79g8j9k102",
+    "name": "Corporate Website Redesign",
+    "description": "Редизайн корпоративного сайта с адаптацией под мобильные устройства",
+    "client_name": "ПАО МедТех",
+    "client_contact_email": "web@medtech.org",
+    "client_contact_phone": "+79004445566",
+    "status": "Completed",
+    "project_type": "Fixed Price",
+    "timesheet_id": "3DEFGHijKLmnOPqrsTUv-wXYZ0987654321",
+    "start_date": "2023-02-01T00:00:00Z",
+    "end_date": "2023-05-31T00:00:00Z",
+    "budget": 400000.0,
+    "repository_url": "https://github.com/medtech/corporate-website",
+    "created_at": "2023-01-20T10:00:00Z",
+    "updated_at": "2023-06-05T12:20:00Z",
+    "specialist_ids": [
+      "d39fe42c-70ff-7683-d890-3h35c4f5g768",
+      "c28ed31b-69ee-6572-c789-2g24b3e4f657"
+    ]
+  }
+] 

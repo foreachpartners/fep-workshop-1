@@ -1,0 +1,115 @@
+[
+  {
+    "id": "d47ef20c-69dd-4583-b789-2f24b4e5f678",
+    "name": "Июнь - Июль 2023",
+    "start_date": "2023-06-01T00:00:00Z",
+    "end_date": "2023-07-31T23:59:59Z",
+    "status": "Approved",
+    "report_id": "1ABCDEfghIJklMNopQRst-uvWXyz12345678",
+    "time_entries": [
+      {
+        "id": "e58fg30d-70ee-5694-c890-3g35c5f6h789",
+        "specialist_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "project_id": "a47bc10b-58cc-4372-a567-0e02b2c3d123",
+        "date": "2023-06-15T00:00:00Z",
+        "hours": 8.0,
+        "description": "Разработка и тестирование API",
+        "created_at": "2023-06-15T19:00:00Z",
+        "updated_at": "2023-06-15T19:00:00Z"
+      },
+      {
+        "id": "f69gh41e-81ff-6705-d901-4h46d5g6h890",
+        "specialist_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "project_id": "a47bc10b-58cc-4372-a567-0e02b2c3d123",
+        "date": "2023-06-16T00:00:00Z",
+        "hours": 8.0,
+        "description": "Интеграция платежных систем",
+        "created_at": "2023-06-16T19:00:00Z",
+        "updated_at": "2023-06-16T19:00:00Z"
+      },
+      {
+        "id": "g70hi52f-92gg-7816-e012-5i57f6h7i901",
+        "specialist_id": "b17dc20a-47dd-5461-b678-1f13a3d2e568",
+        "project_id": "a47bc10b-58cc-4372-a567-0e02b2c3d123",
+        "date": "2023-06-15T00:00:00Z",
+        "hours": 8.0,
+        "description": "Тестирование функциональности корзины",
+        "created_at": "2023-06-15T18:30:00Z",
+        "updated_at": "2023-06-15T18:30:00Z"
+      },
+      {
+        "id": "h81ij63g-03hh-8927-f123-6j68g7i8j012",
+        "specialist_id": "c28ed31b-69ee-6572-c789-2g24b3e4f657",
+        "project_id": "a47bc10b-58cc-4372-a567-0e02b2c3d123",
+        "date": "2023-06-15T00:00:00Z",
+        "hours": 6.0,
+        "description": "Координация работы команды и отчет клиенту",
+        "created_at": "2023-06-15T17:45:00Z",
+        "updated_at": "2023-06-15T17:45:00Z"
+      }
+    ],
+    "specialist_totals": {
+      "f47ac10b-58cc-4372-a567-0e02b2c3d479": 16.0,
+      "b17dc20a-47dd-5461-b678-1f13a3d2e568": 8.0,
+      "c28ed31b-69ee-6572-c789-2g24b3e4f657": 6.0
+    },
+    "project_totals": {
+      "a47bc10b-58cc-4372-a567-0e02b2c3d123": 30.0
+    },
+    "total_hours": 30.0,
+    "created_at": "2023-06-01T00:00:00Z",
+    "updated_at": "2023-08-01T10:30:00Z"
+  },
+  {
+    "id": "j92kl74h-14ii-9038-g234-7k79h8j9k123",
+    "name": "Май 2023",
+    "start_date": "2023-05-01T00:00:00Z",
+    "end_date": "2023-05-31T23:59:59Z",
+    "status": "Paid",
+    "report_id": "2ABCDEfghIJklMNopQRst-uvWXyz09876543",
+    "time_entries": [
+      {
+        "id": "k03lm85i-25jj-0149-h345-8l80i9j0k234",
+        "specialist_id": "d39fe42c-70ff-7683-d890-3h35c4f5g768",
+        "project_id": "i94jk55f-13ll-1027-h234-7l79g8j9k102",
+        "date": "2023-05-10T00:00:00Z",
+        "hours": 7.5,
+        "description": "Финальные правки дизайна главной страницы",
+        "created_at": "2023-05-10T18:00:00Z",
+        "updated_at": "2023-05-10T18:00:00Z"
+      },
+      {
+        "id": "l14mn96j-36kk-1250-i456-9m91j0k1l345",
+        "specialist_id": "c28ed31b-69ee-6572-c789-2g24b3e4f657",
+        "project_id": "i94jk55f-13ll-1027-h234-7l79g8j9k102",
+        "date": "2023-05-10T00:00:00Z",
+        "hours": 4.0,
+        "description": "Приемка работ и подготовка отчета",
+        "created_at": "2023-05-10T17:30:00Z",
+        "updated_at": "2023-05-10T17:30:00Z"
+      },
+      {
+        "id": "m25no07k-47ll-2361-j567-0n02k1l2m456",
+        "specialist_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "project_id": "h83ij44e-02kk-0916-g123-6k68f7i8j091",
+        "date": "2023-05-05T00:00:00Z",
+        "hours": 8.0,
+        "description": "Разработка функционала авторизации",
+        "created_at": "2023-05-05T19:15:00Z",
+        "updated_at": "2023-05-05T19:15:00Z"
+      }
+    ],
+    "specialist_totals": {
+      "d39fe42c-70ff-7683-d890-3h35c4f5g768": 7.5,
+      "c28ed31b-69ee-6572-c789-2g24b3e4f657": 4.0,
+      "f47ac10b-58cc-4372-a567-0e02b2c3d479": 8.0
+    },
+    "project_totals": {
+      "i94jk55f-13ll-1027-h234-7l79g8j9k102": 11.5,
+      "h83ij44e-02kk-0916-g123-6k68f7i8j091": 8.0
+    },
+    "total_hours": 19.5,
+    "created_at": "2023-05-01T00:00:00Z",
+    "updated_at": "2023-06-10T09:15:00Z"
+  }
+] 
