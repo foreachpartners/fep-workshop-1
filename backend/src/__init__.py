@@ -1,3 +1,3 @@
-"""Backend service for time and materials accounting with Google Sheets API."""
+"""Time & Materials accounting service."""
 
 __version__ = "0.1.0" 
