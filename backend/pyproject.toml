@@ -1,0 +1,42 @@
+[project]
+name = "t-and-m-accounting"
+version = "0.1.0"
+description = "Backend service for time and materials accounting with Google Sheets"
+authors = [
+    {name = "Developer", email = "developer@example.com"},
+]
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Proprietary"}
+
+dependencies = [
+    # Empty for now, will be added in step 2
+]
+
+[project.optional-dependencies]
+dev = [
+    # Empty for now, will be added in step 2
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
