@@ -215,7 +215,7 @@ class GoogleSheetsExplorer:
                 
         try:
             # Create a timestamp for unique name
-            timestamp = datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')
+            timestamp = datetime.datetime.now(datetime.UTC).strftime('%Y%m%d%H%M%S')
             
             # Use provided name or default with timestamp
             spreadsheet_name = name or f"Test Sheet {timestamp}"
@@ -277,46 +277,61 @@ class GoogleSheetsExplorer:
                 body=body
             ).execute()
             
-            # Format the header row in bold
-            format_request = {
-                'requests': [
-                    {
-                        'repeatCell': {
-                            'range': {
-                                'sheetId': 0,
-                                'startRowIndex': 0,
-                                'endRowIndex': 1,
-                                'startColumnIndex': 0,
-                                'endColumnIndex': 5
-                            },
-                            'cell': {
-                                'userEnteredFormat': {
-                                    'textFormat': {
-                                        'bold': True
-                                    }
-                                }
-                            },
-                            'fields': 'userEnteredFormat.textFormat.bold'
-                        }
-                    },
-                    {
-                        'updateSheetProperties': {
-                            'properties': {
-                                'sheetId': 0,
-                                'gridProperties': {
-                                    'frozenRowCount': 1
-                                }
-                            },
-                            'fields': 'gridProperties.frozenRowCount'
-                        }
-                    }
-                ]
-            }
-            
-            self.sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=spreadsheet_id,
-                body=format_request
+            # Get the sheet ID for the first sheet
+            sheet_metadata = self.sheets_service.spreadsheets().get(
+                spreadsheetId=spreadsheet_id
             ).execute()
+            
+            # Find the sheet ID of the 'Sample Data' sheet
+            sheet_id = None
+            for sheet in sheet_metadata.get('sheets', []):
+                if sheet.get('properties', {}).get('title') == 'Sample Data':
+                    sheet_id = sheet.get('properties', {}).get('sheetId')
+                    break
+                    
+            if sheet_id is None:
+                self.logger.warning("Could not find 'Sample Data' sheet ID. Formatting will be skipped.")
+            else:
+                # Format the header row in bold
+                format_request = {
+                    'requests': [
+                        {
+                            'repeatCell': {
+                                'range': {
+                                    'sheetId': sheet_id,
+                                    'startRowIndex': 0,
+                                    'endRowIndex': 1,
+                                    'startColumnIndex': 0,
+                                    'endColumnIndex': 5
+                                },
+                                'cell': {
+                                    'userEnteredFormat': {
+                                        'textFormat': {
+                                            'bold': True
+                                        }
+                                    }
+                                },
+                                'fields': 'userEnteredFormat.textFormat.bold'
+                            }
+                        },
+                        {
+                            'updateSheetProperties': {
+                                'properties': {
+                                    'sheetId': sheet_id,
+                                    'gridProperties': {
+                                        'frozenRowCount': 1
+                                    }
+                                },
+                                'fields': 'gridProperties.frozenRowCount'
+                            }
+                        }
+                    ]
+                }
+                
+                self.sheets_service.spreadsheets().batchUpdate(
+                    spreadsheetId=spreadsheet_id,
+                    body=format_request
+                ).execute()
             
             # Get the link to the spreadsheet
             spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
