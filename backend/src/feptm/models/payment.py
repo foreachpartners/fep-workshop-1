@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,14 @@ class PaymentStatus(str, Enum):
     APPROVED = "Approved"
     PAID = "Paid"
     REJECTED = "Rejected"
+
+
+class PeriodStatus(str, Enum):
+    """Payment period status enumeration."""
+    
+    OPEN = "Open"
+    CLOSED = "Closed"
+    LOCKED = "Locked"
 
 
 class TimeEntry(BaseModel):
@@ -39,7 +47,7 @@ class PaymentPeriod(BaseModel):
     name: Optional[str] = None
     start_date: datetime
     end_date: datetime
-    status: PaymentStatus = PaymentStatus.DRAFT
+    status: Union[PaymentStatus, PeriodStatus] = PaymentStatus.DRAFT
     report_id: Optional[str] = None
     time_entries: List[TimeEntry] = Field(default_factory=list)
     specialist_totals: Dict[str, float] = Field(default_factory=dict)

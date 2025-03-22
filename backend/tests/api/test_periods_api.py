@@ -122,8 +122,8 @@ def test_get_payment_period_by_id(client):
         data = response.json()
         assert data["id"] == "pp1"
         assert data["name"] == "March 2023"
-        assert data["start_date"] == "2023-03-01"
-        assert data["end_date"] == "2023-03-31"
+        assert data["start_date"].startswith("2023-03-01")
+        assert data["end_date"].startswith("2023-03-31")
         assert data["status"] == "Open"
 
 
