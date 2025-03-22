@@ -44,6 +44,7 @@ run-api = "bin.run_api:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+pythonpath = ["src"]
 
 [tool.black]
 line-length = 88
@@ -59,3 +60,9 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=8.3.5",
+]
