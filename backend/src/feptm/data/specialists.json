@@ -1,0 +1,52 @@
+[
+  {
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "full_name": "Иван Петров",
+    "email": "ivan.petrov@example.com",
+    "role": "Developer",
+    "hourly_rate": 50.0,
+    "active": true,
+    "hire_date": "2023-01-15T00:00:00Z",
+    "leave_date": null
+  },
+  {
+    "id": "b17dc20a-47dd-5461-b678-1f13a3d2e568",
+    "full_name": "Анна Смирнова",
+    "email": "anna.smirnova@example.com",
+    "role": "QA",
+    "hourly_rate": 45.0,
+    "active": true,
+    "hire_date": "2023-02-01T00:00:00Z",
+    "leave_date": null
+  },
+  {
+    "id": "c28ed31b-69ee-6572-c789-2g24b3e4f657",
+    "full_name": "Сергей Иванов",
+    "email": "sergey.ivanov@example.com",
+    "role": "Project Manager",
+    "hourly_rate": 60.0,
+    "active": true,
+    "hire_date": "2022-11-20T00:00:00Z",
+    "leave_date": null
+  },
+  {
+    "id": "d39fe42c-70ff-7683-d890-3h35c4f5g768",
+    "full_name": "Елена Козлова",
+    "email": "elena.kozlova@example.com",
+    "role": "Designer",
+    "hourly_rate": 55.0,
+    "active": true,
+    "hire_date": "2023-03-15T00:00:00Z",
+    "leave_date": null
+  },
+  {
+    "id": "e40gf53d-81gg-8794-e901-4i46d5g6h879",
+    "full_name": "Алексей Николаев",
+    "email": "alexey.nikolaev@example.com",
+    "role": "DevOps",
+    "hourly_rate": 65.0,
+    "active": false,
+    "hire_date": "2022-09-10T00:00:00Z",
+    "leave_date": "2023-06-30T00:00:00Z"
+  }
+] 
