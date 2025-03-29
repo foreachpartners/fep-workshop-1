@@ -117,4 +117,10 @@ class ProjectMetaResponse(BaseModel):
     spreadsheet_id: str
     spreadsheet_url: str
     drive_folder_id: Optional[str] = None
-    drive_folder_url: Optional[str] = None 
+    drive_folder_url: Optional[str] = None
+    project_info_spreadsheet_id: Optional[str] = None
+    project_info_spreadsheet_url: Optional[str] = None
+    report_spreadsheet_id: Optional[str] = None
+    report_spreadsheet_url: Optional[str] = None
+    calculations_spreadsheet_id: Optional[str] = None
+    calculations_spreadsheet_url: Optional[str] = None 

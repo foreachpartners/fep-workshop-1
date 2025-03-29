@@ -32,6 +32,17 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_TIMESHEET_TEMPLATE_ID: Optional[str] = None
     GOOGLE_REPORT_TEMPLATE_ID: Optional[str] = None
+    
+    # Google Drive settings for projects
+    # Важно: убедитесь, что все эти файлы доступны для пользователя,
+    # аутентифицированного через OAuth (настройте "Доступ по ссылке")
+    GOOGLE_PROJECTS_FOLDER_ID: Optional[str] = None # Укажите здесь ID папки в Google Drive
+    
+    # Шаблоны Google Sheets - укажите здесь свои идентификаторы или обновите переменные среды
+    # Чтобы шаблоны были доступны, для них должен быть включен "Доступ по ссылке" (Share > General Access)
+    GOOGLE_PROJECT_INFO_TEMPLATE_ID: Optional[str] = None 
+    GOOGLE_PROJECT_REPORT_TEMPLATE_ID: Optional[str] = None 
+    GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID: Optional[str] = None
 
     # Model configurations
     SPECIALIST_ROLES: list[str] = Field(
