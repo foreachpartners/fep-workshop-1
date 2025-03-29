@@ -73,3 +73,48 @@ class Project(BaseModel):
                 ]
             }
         } 
+
+
+class ProjectMeta(BaseModel):
+    """ProjectMeta model for creating project metadata in Google Sheets."""
+    
+    name: str
+    description: Optional[str] = None
+    client_name: Optional[str] = None
+    client_contact_email: Optional[str] = None
+    client_contact_phone: Optional[str] = None
+    project_type: ProjectType = ProjectType.TIME_AND_MATERIALS
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    budget: Optional[float] = None
+    contract_number: Optional[str] = None
+    drive_folder_id: Optional[str] = None
+    
+    class Config:
+        """Model configuration."""
+        
+        json_schema_extra = {
+            "example": {
+                "name": "E-Commerce Platform",
+                "description": "Development of online store with payment integration",
+                "client_name": "ABC Retail",
+                "client_contact_email": "contact@abcretail.com",
+                "client_contact_phone": "+1234567890",
+                "project_type": "Time and Materials",
+                "start_date": "2023-03-01T00:00:00Z",
+                "end_date": "2023-12-31T00:00:00Z",
+                "budget": 50000.0,
+                "contract_number": "ABC-2023-001",
+                "drive_folder_id": "1abCdEfGhIjKlMnOpQrStUvWxYz"
+            }
+        }
+
+
+class ProjectMetaResponse(BaseModel):
+    """Response model for project metadata creation."""
+    
+    project_id: str
+    spreadsheet_id: str
+    spreadsheet_url: str
+    drive_folder_id: Optional[str] = None
+    drive_folder_url: Optional[str] = None 

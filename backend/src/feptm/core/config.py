@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     API_KEY: Optional[str] = None
 
     # Google API settings
-    GOOGLE_CREDENTIALS_FILE: Optional[Path] = None
-    GOOGLE_TOKEN_FILE: Optional[Path] = None
+    GOOGLE_CREDENTIALS_FILE: Optional[Path] = Path(__file__).resolve().parent.parent.parent.parent / "credentials.json" if (Path(__file__).resolve().parent.parent.parent.parent / "credentials.json").exists() else None
+    GOOGLE_TOKEN_FILE: Optional[Path] = Path.home() / ".google_sheets_token.json"
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_TIMESHEET_TEMPLATE_ID: Optional[str] = None
