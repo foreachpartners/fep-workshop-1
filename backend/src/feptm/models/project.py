@@ -89,6 +89,8 @@ class ProjectMeta(BaseModel):
     budget: Optional[float] = None
     contract_number: Optional[str] = None
     drive_folder_id: Optional[str] = None
+    calculations_url: Optional[str] = None
+    report_url: Optional[str] = None
     
     class Config:
         """Model configuration."""
@@ -105,7 +107,9 @@ class ProjectMeta(BaseModel):
                 "end_date": "2023-12-31T00:00:00Z",
                 "budget": 50000.0,
                 "contract_number": "ABC-2023-001",
-                "drive_folder_id": "1abCdEfGhIjKlMnOpQrStUvWxYz"
+                "drive_folder_id": "1abCdEfGhIjKlMnOpQrStUvWxYz",
+                "calculations_url": "https://docs.google.com/spreadsheets/d/1abCdEfGhIjKlMnOpQrStUvWxYz/edit",
+                "report_url": "https://docs.google.com/spreadsheets/d/1abCdEfGhIjKlMnOpQrStUvWxYz/edit"
             }
         }
 

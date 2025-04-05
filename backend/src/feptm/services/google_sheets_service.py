@@ -141,36 +141,8 @@ class GoogleSheetsService:
         spreadsheet_body = {
             "properties": {
                 "title": title
-            },
-            "sheets": [
-                {
-                    "properties": {
-                        "title": "Информация о проекте",
-                        "gridProperties": {
-                            "rowCount": 20,
-                            "columnCount": 8
-                        }
-                    }
-                },
-                {
-                    "properties": {
-                        "title": "Специалисты проекта",
-                        "gridProperties": {
-                            "rowCount": 100,
-                            "columnCount": 8
-                        }
-                    }
-                },
-                {
-                    "properties": {
-                        "title": "Периоды оплаты",
-                        "gridProperties": {
-                            "rowCount": 100,
-                            "columnCount": 6
-                        }
-                    }
-                }
-            ]
+            }
+            # Не создаем листы, так как мы копируем шаблоны, у которых уже есть нужная структура
         }
         
         try:
@@ -214,6 +186,48 @@ class GoogleSheetsService:
         except HttpError as error:
             raise Exception(f"Failed to get sheet IDs: {error}")
 
+    def _get_sheet_by_name(self, spreadsheet_id: str, sheet_name: str) -> Optional[Dict[str, Any]]:
+        """Находит лист в таблице по его названию.
+        
+        Args:
+            spreadsheet_id: ID таблицы
+            sheet_name: Название искомого листа
+            
+        Returns:
+            Словарь с информацией о найденном листе или None, если лист не найден
+        """
+        try:
+            # Получаем метаданные о листах таблицы
+            spreadsheet_metadata = self.sheets_service.spreadsheets().get(
+                spreadsheetId=spreadsheet_id
+            ).execute()
+            
+            # Получаем список листов
+            sheets = spreadsheet_metadata.get('sheets', [])
+            if not sheets:
+                print(f"Warning: No sheets found in the spreadsheet with ID {spreadsheet_id}")
+                return None
+            
+            # Ищем лист с указанным именем
+            target_sheet = None
+            available_sheets = []
+            for sheet in sheets:
+                sheet_title = sheet['properties']['title']
+                available_sheets.append(sheet_title)
+                if sheet_title == sheet_name:
+                    target_sheet = sheet
+                    break
+            
+            if not target_sheet:
+                print(f"Warning: Sheet '{sheet_name}' not found. Available sheets: {', '.join(available_sheets)}")
+                return None
+            
+            return target_sheet
+            
+        except HttpError as error:
+            print(f"Error getting sheet by name: {error}")
+            return None
+
     def update_project_info_sheet(
         self, spreadsheet_id: str, project_meta: ProjectMeta
     ) -> None:
@@ -226,38 +240,53 @@ class GoogleSheetsService:
         Returns:
             None
         """
-        # Prepare project info data
-        project_data = [
-            ["Информация о проекте", "", "", "", "", "", "", ""],
-            ["", "", "", "", "", "", "", ""],
-            ["Название проекта", project_meta.name or "", "", "", "", "", "", ""],
-            ["Описание", project_meta.description or "", "", "", "", "", "", ""],
-            ["", "", "", "", "", "", "", ""],
-            ["Информация о заказчике", "", "", "", "", "", "", ""],
-            ["Название компании", project_meta.client_name or "", "", "", "", "", "", ""],
-            ["Email", project_meta.client_contact_email or "", "", "", "", "", "", ""],
-            ["Телефон", project_meta.client_contact_phone or "", "", "", "", "", "", ""],
-            ["", "", "", "", "", "", "", ""],
-            ["Информация о проекте", "", "", "", "", "", "", ""],
-            ["Дата начала", project_meta.start_date.isoformat() if project_meta.start_date else "", "", "", "", "", "", ""],
-            ["Дата окончания", project_meta.end_date.isoformat() if project_meta.end_date else "", "", "", "", "", "", ""],
-            ["Тип проекта", project_meta.project_type.value if project_meta.project_type else "", "", "", "", "", "", ""],
-            ["Бюджет", str(project_meta.budget) if project_meta.budget else "", "", "", "", "", "", ""],
-            ["Номер договора", project_meta.contract_number or "", "", "", "", "", "", ""],
-            ["ID папки на Google Drive", project_meta.drive_folder_id or "", "", "", "", "", "", ""],
-        ]
-        
         try:
-            # Update the "Информация о проекте" sheet
+            # Получаем лист "Project info"
+            project_info_sheet = self._get_sheet_by_name(spreadsheet_id, "Project info")
+            
+            if not project_info_sheet:
+                raise Exception(f"Failed to find sheet 'Project info' in the spreadsheet with ID {spreadsheet_id}")
+            
+            sheet_title = project_info_sheet['properties']['title']
+            
+            # Подготавливаем данные по модели "Name"/"Value"
+            project_data = [
+                ["Name", "Value"],
+                ["ProjectName", project_meta.name or ""]
+            ]
+            
+            # Добавляем ссылку на сам документ с информацией о проекте
+            spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
+            project_data.append(["Project Info", f'=HYPERLINK("{spreadsheet_url}"; "{spreadsheet_url}")'])
+            
+            # Добавляем ссылку на папку с проектом, если есть
+            if project_meta.drive_folder_id:
+                folder_url = f"https://drive.google.com/drive/folders/{project_meta.drive_folder_id}"
+                project_data.append(["Project Folder", f'=HYPERLINK("{folder_url}"; "{folder_url}")'])
+            
+            # Добавляем ссылки на созданные документы, если они есть
+            if project_meta.calculations_url:
+                project_data.append(["Payment Distribution", f'=HYPERLINK("{project_meta.calculations_url}"; "{project_meta.calculations_url}")'])
+            if project_meta.report_url:
+                project_data.append(["General Expenses", f'=HYPERLINK("{project_meta.report_url}"; "{project_meta.report_url}")'])
+            
+            # Сначала очищаем диапазон, чтобы убрать старые данные
+            try:
+                self.sheets_service.spreadsheets().values().clear(
+                    spreadsheetId=spreadsheet_id,
+                    range=f"{sheet_title}!A1:B15",
+                    body={}
+                ).execute()
+            except HttpError as error:
+                print(f"Warning: Failed to clear range before update: {error}")
+            
+            # Обновляем лист документа, используя точное название листа
             request = self.sheets_service.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range="Информация о проекте!A1:H17",
+                range=f"{sheet_title}!A1:B15",  # Увеличиваем диапазон для добавления новых полей
                 valueInputOption="USER_ENTERED",
                 body={"values": project_data}
             ).execute()
-            
-            # Format the sheet
-            self._format_project_info_sheet(spreadsheet_id)
             
             return None
         except HttpError as error:
@@ -278,16 +307,21 @@ class GoogleSheetsService:
         ]
         
         try:
-            # Update the "Специалисты проекта" sheet
+            # Получаем лист "Team"
+            specialists_sheet = self._get_sheet_by_name(spreadsheet_id, "Team")
+            
+            if not specialists_sheet:
+                raise Exception(f"Failed to find sheet 'Team' in the spreadsheet with ID {spreadsheet_id}")
+                
+            sheet_title = specialists_sheet['properties']['title']
+            
+            # Update the specialists sheet using its exact name
             request = self.sheets_service.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range="Специалисты проекта!A1:H1",
+                range=f"{sheet_title}!A1:H1",
                 valueInputOption="USER_ENTERED",
                 body={"values": specialists_headers}
             ).execute()
-            
-            # Format the sheet
-            self._format_specialists_sheet(spreadsheet_id)
             
             return None
         except HttpError as error:
@@ -308,16 +342,25 @@ class GoogleSheetsService:
         ]
         
         try:
-            # Update the "Периоды оплаты" sheet
+            # Сначала ищем лист "Periods"
+            periods_sheet = self._get_sheet_by_name(spreadsheet_id, "Periods")
+            
+            # Если не нашли "Periods", ищем "Payment periods"
+            if not periods_sheet:
+                periods_sheet = self._get_sheet_by_name(spreadsheet_id, "Payment periods")
+            
+            if not periods_sheet:
+                raise Exception(f"Failed to find sheet 'Periods' or 'Payment periods' in the spreadsheet with ID {spreadsheet_id}")
+                
+            sheet_title = periods_sheet['properties']['title']
+            
+            # Update the periods sheet using its exact name
             request = self.sheets_service.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range="Периоды оплаты!A1:F1",
+                range=f"{sheet_title}!A1:F1",
                 valueInputOption="USER_ENTERED",
                 body={"values": periods_headers}
             ).execute()
-            
-            # Format the sheet
-            self._format_periods_sheet(spreadsheet_id)
             
             return None
         except HttpError as error:
@@ -333,14 +376,14 @@ class GoogleSheetsService:
             None
         """
         try:
-            # Get sheet IDs
-            sheet_ids = self._get_sheet_ids(spreadsheet_id)
-            sheet_id = sheet_ids.get("Информация о проекте")
+            # Получаем лист "Project info"
+            project_info_sheet = self._get_sheet_by_name(spreadsheet_id, "Project info")
             
-            if not sheet_id:
-                print("Warning: Could not find sheet ID for 'Информация о проекте'. Formatting will be skipped.")
-                return None
-                
+            if not project_info_sheet:
+                raise Exception(f"Failed to find sheet 'Project info' in the spreadsheet with ID {spreadsheet_id}")
+            
+            sheet_id = project_info_sheet['properties']['sheetId']
+            
             format_requests = [
                 # Title formatting
                 {
@@ -417,6 +460,56 @@ class GoogleSheetsService:
                         "fields": "userEnteredFormat(textFormat,backgroundColor)"
                     }
                 },
+                # Форматирование для раздела "Связанные документы"
+                {
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": 18,  # Примерная позиция для раздела "Связанные документы"
+                            "endRowIndex": 19,
+                            "startColumnIndex": 0,
+                            "endColumnIndex": 8
+                        },
+                        "cell": {
+                            "userEnteredFormat": {
+                                "textFormat": {
+                                    "bold": True
+                                },
+                                "backgroundColor": {
+                                    "red": 0.95,
+                                    "green": 0.95,
+                                    "blue": 0.95
+                                }
+                            }
+                        },
+                        "fields": "userEnteredFormat(textFormat,backgroundColor)"
+                    }
+                },
+                # Заголовки таблицы связанных документов
+                {
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": 20,  # Заголовки столбцов
+                            "endRowIndex": 21,
+                            "startColumnIndex": 0,
+                            "endColumnIndex": 2
+                        },
+                        "cell": {
+                            "userEnteredFormat": {
+                                "textFormat": {
+                                    "bold": True
+                                },
+                                "backgroundColor": {
+                                    "red": 0.95,
+                                    "green": 0.95,
+                                    "blue": 0.95
+                                }
+                            }
+                        },
+                        "fields": "userEnteredFormat(textFormat,backgroundColor)"
+                    }
+                },
                 # Field labels formatting
                 {
                     "repeatCell": {
@@ -459,14 +552,14 @@ class GoogleSheetsService:
             None
         """
         try:
-            # Get sheet IDs
-            sheet_ids = self._get_sheet_ids(spreadsheet_id)
-            sheet_id = sheet_ids.get("Специалисты проекта")
+            # Получаем лист "Team"
+            specialists_sheet = self._get_sheet_by_name(spreadsheet_id, "Team")
             
-            if not sheet_id:
-                print("Warning: Could not find sheet ID for 'Специалисты проекта'. Formatting will be skipped.")
-                return None
-                
+            if not specialists_sheet:
+                raise Exception(f"Failed to find sheet 'Team' in the spreadsheet with ID {spreadsheet_id}")
+            
+            sheet_id = specialists_sheet['properties']['sheetId']
+            
             format_requests = [
                 # Headers formatting
                 {
@@ -515,14 +608,18 @@ class GoogleSheetsService:
             None
         """
         try:
-            # Get sheet IDs
-            sheet_ids = self._get_sheet_ids(spreadsheet_id)
-            sheet_id = sheet_ids.get("Периоды оплаты")
+            # Сначала ищем лист "Periods"
+            periods_sheet = self._get_sheet_by_name(spreadsheet_id, "Periods")
             
-            if not sheet_id:
-                print("Warning: Could not find sheet ID for 'Периоды оплаты'. Formatting will be skipped.")
-                return None
-                
+            # Если не нашли "Periods", ищем "Payment periods"
+            if not periods_sheet:
+                periods_sheet = self._get_sheet_by_name(spreadsheet_id, "Payment periods")
+            
+            if not periods_sheet:
+                raise Exception(f"Failed to find sheet 'Periods' or 'Payment periods' in the spreadsheet with ID {spreadsheet_id}")
+            
+            sheet_id = periods_sheet['properties']['sheetId']
+            
             format_requests = [
                 # Headers formatting
                 {
@@ -707,6 +804,8 @@ class GoogleSheetsService:
             project_id = generate_uuid()
             project_name = project_meta.name
             
+            print(f"Creating project: {project_name}")
+            
             # 1. Create a folder for the project
             parent_folder_id = settings.GOOGLE_PROJECTS_FOLDER_ID
             
@@ -714,19 +813,21 @@ class GoogleSheetsService:
             if parent_folder_id:
                 # Verify that parent folder exists and is accessible
                 try:
-                    self.drive_service.files().get(fileId=parent_folder_id, fields="id,name").execute()
+                    parent_folder = self.drive_service.files().get(fileId=parent_folder_id, fields="id,name").execute()
+                    print(f"Parent folder found: {parent_folder.get('name')} (ID: {parent_folder.get('id')})")
                 except HttpError as error:
                     if error.resp.status == 404:
                         raise Exception(f"Parent folder with ID {parent_folder_id} not found. Check GOOGLE_PROJECTS_FOLDER_ID setting and make sure you have access to this folder.")
                     else:
                         raise Exception(f"Error accessing parent folder: {str(error)}")
                 
-                folder_info = self.create_drive_folder(f"Проект: {project_name}", parent_folder_id)
+                folder_info = self.create_drive_folder(f"{project_name}", parent_folder_id)
             else:
                 # If no parent folder ID is set, create in the root of Google Drive
-                folder_info = self.create_drive_folder(f"Проект: {project_name}")
+                folder_info = self.create_drive_folder(f"{project_name}")
                 
             project_folder_id = folder_info["folder_id"]
+            print(f"Created project folder: {project_name} (ID: {project_folder_id})")
             
             # 2. Create project info spreadsheet from template
             project_info_template_id = settings.GOOGLE_PROJECT_INFO_TEMPLATE_ID
@@ -735,7 +836,8 @@ class GoogleSheetsService:
             
             # Verify that template exists and is accessible
             try:
-                self.drive_service.files().get(fileId=project_info_template_id, fields="id,name").execute()
+                template_info = self.drive_service.files().get(fileId=project_info_template_id, fields="id,name").execute()
+                print(f"Project info template found: {template_info.get('name')} (ID: {template_info.get('id')})")
             except HttpError as error:
                 if error.resp.status == 404:
                     raise Exception(f"Project info template with ID {project_info_template_id} not found. Check GOOGLE_PROJECT_INFO_TEMPLATE_ID setting and make sure you have access to this file.")
@@ -744,9 +846,10 @@ class GoogleSheetsService:
             
             project_info = self.copy_spreadsheet_from_template(
                 project_info_template_id,
-                f"{project_name} - Информация о проекте",
+                f"{project_name} - Project info",
                 project_folder_id
             )
+            print(f"Created project info spreadsheet: {project_name} - Project info (ID: {project_info.get('spreadsheet_id')})")
             
             # 3. Create report spreadsheet from template
             report_template_id = settings.GOOGLE_PROJECT_REPORT_TEMPLATE_ID
@@ -755,7 +858,8 @@ class GoogleSheetsService:
             
             # Verify that template exists and is accessible
             try:
-                self.drive_service.files().get(fileId=report_template_id, fields="id,name").execute()
+                template_info = self.drive_service.files().get(fileId=report_template_id, fields="id,name").execute()
+                print(f"Report template found: {template_info.get('name')} (ID: {template_info.get('id')})")
             except HttpError as error:
                 if error.resp.status == 404:
                     raise Exception(f"Report template with ID {report_template_id} not found. Check GOOGLE_PROJECT_REPORT_TEMPLATE_ID setting and make sure you have access to this file.")
@@ -764,9 +868,10 @@ class GoogleSheetsService:
             
             report = self.copy_spreadsheet_from_template(
                 report_template_id,
-                f"{project_name} - Сводный отчет",
+                f"{project_name} - General Expenses",
                 project_folder_id
             )
+            print(f"Created report spreadsheet: {project_name} - General Expenses (ID: {report.get('spreadsheet_id')})")
             
             # 4. Create calculations spreadsheet from template
             calculations_template_id = settings.GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID
@@ -775,7 +880,8 @@ class GoogleSheetsService:
             
             # Verify that template exists and is accessible
             try:
-                self.drive_service.files().get(fileId=calculations_template_id, fields="id,name").execute()
+                template_info = self.drive_service.files().get(fileId=calculations_template_id, fields="id,name").execute()
+                print(f"Calculations template found: {template_info.get('name')} (ID: {template_info.get('id')})")
             except HttpError as error:
                 if error.resp.status == 404:
                     raise Exception(f"Calculations template with ID {calculations_template_id} not found. Check GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID setting and make sure you have access to this file.")
@@ -784,9 +890,30 @@ class GoogleSheetsService:
             
             calculations = self.copy_spreadsheet_from_template(
                 calculations_template_id,
-                f"{project_name} - Расчеты",
+                f"{project_name} - Payment Distribution",
                 project_folder_id
             )
+            print(f"Created calculations spreadsheet: {project_name} - Payment Distribution (ID: {calculations.get('spreadsheet_id')})")
+            
+            # Обновляем информацию о проекте, добавляя ссылки на созданные документы
+            # Создаем обновленный объект ProjectMeta с ссылками на другие документы
+            updated_project_meta = ProjectMeta(
+                name=project_name,
+                drive_folder_id=project_folder_id,
+                calculations_url=calculations["spreadsheet_url"],
+                report_url=report["spreadsheet_url"]
+            )
+            
+            # Обновляем основную информацию о проекте
+            print(f"Updating project info with links to related documents:")
+            print(f"  - Project name: {project_name}")
+            print(f"  - Project info URL: {project_info['spreadsheet_url']}")
+            print(f"  - Folder URL: https://drive.google.com/drive/folders/{project_folder_id}")
+            print(f"  - Calculations URL: {calculations['spreadsheet_url']}")
+            print(f"  - Report URL: {report['spreadsheet_url']}")
+            
+            self.update_project_info_sheet(project_info["spreadsheet_id"], updated_project_meta)
+            print(f"Project info updated successfully")
             
             # Return all information about the created project
             return {
