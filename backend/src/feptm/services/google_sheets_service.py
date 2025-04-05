@@ -1,9 +1,9 @@
 """Service for working with Google Sheets API."""
 
 import json
-import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+from datetime import datetime
 
 from google.oauth2.credentials import Credentials as UserCredentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -13,7 +13,13 @@ from googleapiclient.errors import HttpError
 
 from feptm.core.config import settings
 from feptm.core.utils import generate_uuid
-from feptm.models import ProjectMeta
+from feptm.models import Project
+from feptm.services.google_sheets_helper import find_credentials_file, get_sheet_by_name
+from feptm.services.google_sheets_business import (
+    update_project_info_sheet,
+    format_project_info_sheet,
+    create_project_metadata
+)
 
 
 class GoogleSheetsService:
@@ -21,39 +27,11 @@ class GoogleSheetsService:
 
     def __init__(self):
         """Initialize service with credentials."""
-        self.credentials_file = settings.GOOGLE_CREDENTIALS_FILE or self._find_credentials_file()
-        self.token_file = settings.GOOGLE_TOKEN_FILE or os.path.expanduser("~/.google_sheets_token.json")
+        self.credentials_file = settings.GOOGLE_CREDENTIALS_FILE or find_credentials_file()
+        self.token_file = settings.GOOGLE_TOKEN_FILE or Path.home() / ".google_sheets_token.json"
         self.sheets_service = None
         self.drive_service = None
         self.initialize()
-
-    def _find_credentials_file(self) -> str:
-        """Find the credentials file in default locations.
-        
-        Returns:
-            Path to the credentials file
-            
-        Raises:
-            FileNotFoundError: If no credentials file can be found
-        """
-        default_locations = [
-            "credentials.json",
-            "backend/credentials.json",
-            os.path.expanduser("~/.config/google/credentials.json"),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "credentials.json"),
-        ]
-        
-        # Check default locations
-        for location in default_locations:
-            if os.path.isfile(location):
-                return location
-        
-        # If we get here, no credentials file was found
-        locations_str = "\n- ".join([""] + default_locations)
-        raise FileNotFoundError(
-            f"Could not find Google API credentials file. "
-            f"Please place credentials.json in one of the following locations:{locations_str}"
-        )
 
     def initialize(self) -> bool:
         """Initialize the Google Drive and Sheets API services.
@@ -94,10 +72,11 @@ class GoogleSheetsService:
         ]
         
         # Check if token file exists and load credentials from it
-        if self.token_file and Path(self.token_file).exists():
+        token_path = Path(self.token_file)
+        if token_path.exists():
             try:
                 creds = UserCredentials.from_authorized_user_info(
-                    json.loads(Path(self.token_file).read_text()),
+                    json.loads(token_path.read_text()),
                     scopes
                 )
             except Exception as e:
@@ -114,18 +93,17 @@ class GoogleSheetsService:
                 creds = flow.run_local_server(port=0)
             
             # Save the credentials for the next run
-            if self.token_file:
-                token_path = Path(self.token_file)
-                token_path.parent.mkdir(parents=True, exist_ok=True)
-                token_path.write_text(json.dumps({
-                    'token': creds.token,
-                    'refresh_token': creds.refresh_token,
-                    'token_uri': creds.token_uri,
-                    'client_id': creds.client_id,
-                    'client_secret': creds.client_secret,
-                    'scopes': creds.scopes
-                }))
-                print(f"Saved credentials to {self.token_file}")
+            token_path = Path(self.token_file)
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            token_path.write_text(json.dumps({
+                'token': creds.token,
+                'refresh_token': creds.refresh_token,
+                'token_uri': creds.token_uri,
+                'client_id': creds.client_id,
+                'client_secret': creds.client_secret,
+                'scopes': creds.scopes
+            }))
+            print(f"Saved credentials to {self.token_file}")
         
         return creds
 
@@ -142,7 +120,7 @@ class GoogleSheetsService:
             "properties": {
                 "title": title
             }
-            # Не создаем листы, так как мы копируем шаблоны, у которых уже есть нужная структура
+            # We don't create sheets because we copy from templates that already have the needed structure
         }
         
         try:
@@ -186,527 +164,6 @@ class GoogleSheetsService:
         except HttpError as error:
             raise Exception(f"Failed to get sheet IDs: {error}")
 
-    def _get_sheet_by_name(self, spreadsheet_id: str, sheet_name: str) -> Optional[Dict[str, Any]]:
-        """Находит лист в таблице по его названию.
-        
-        Args:
-            spreadsheet_id: ID таблицы
-            sheet_name: Название искомого листа
-            
-        Returns:
-            Словарь с информацией о найденном листе или None, если лист не найден
-        """
-        try:
-            # Получаем метаданные о листах таблицы
-            spreadsheet_metadata = self.sheets_service.spreadsheets().get(
-                spreadsheetId=spreadsheet_id
-            ).execute()
-            
-            # Получаем список листов
-            sheets = spreadsheet_metadata.get('sheets', [])
-            if not sheets:
-                print(f"Warning: No sheets found in the spreadsheet with ID {spreadsheet_id}")
-                return None
-            
-            # Ищем лист с указанным именем
-            target_sheet = None
-            available_sheets = []
-            for sheet in sheets:
-                sheet_title = sheet['properties']['title']
-                available_sheets.append(sheet_title)
-                if sheet_title == sheet_name:
-                    target_sheet = sheet
-                    break
-            
-            if not target_sheet:
-                print(f"Warning: Sheet '{sheet_name}' not found. Available sheets: {', '.join(available_sheets)}")
-                return None
-            
-            return target_sheet
-            
-        except HttpError as error:
-            print(f"Error getting sheet by name: {error}")
-            return None
-
-    def update_project_info_sheet(
-        self, spreadsheet_id: str, project_meta: ProjectMeta
-    ) -> None:
-        """Update project info sheet with metadata.
-        
-        Args:
-            spreadsheet_id: ID of the spreadsheet
-            project_meta: Project metadata
-            
-        Returns:
-            None
-        """
-        try:
-            # Получаем лист "Project info"
-            project_info_sheet = self._get_sheet_by_name(spreadsheet_id, "Project info")
-            
-            if not project_info_sheet:
-                raise Exception(f"Failed to find sheet 'Project info' in the spreadsheet with ID {spreadsheet_id}")
-            
-            sheet_title = project_info_sheet['properties']['title']
-            
-            # Подготавливаем данные по модели "Name"/"Value"
-            project_data = [
-                ["Name", "Value"],
-                ["ProjectName", project_meta.name or ""]
-            ]
-            
-            # Добавляем ссылку на сам документ с информацией о проекте
-            spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
-            project_data.append(["Project Info", f'=HYPERLINK("{spreadsheet_url}"; "{spreadsheet_url}")'])
-            
-            # Добавляем ссылку на папку с проектом, если есть
-            if project_meta.drive_folder_id:
-                folder_url = f"https://drive.google.com/drive/folders/{project_meta.drive_folder_id}"
-                project_data.append(["Project Folder", f'=HYPERLINK("{folder_url}"; "{folder_url}")'])
-            
-            # Добавляем ссылки на созданные документы, если они есть
-            if project_meta.calculations_url:
-                project_data.append(["Payment Distribution", f'=HYPERLINK("{project_meta.calculations_url}"; "{project_meta.calculations_url}")'])
-            if project_meta.report_url:
-                project_data.append(["General Expenses", f'=HYPERLINK("{project_meta.report_url}"; "{project_meta.report_url}")'])
-            
-            # Сначала очищаем диапазон, чтобы убрать старые данные
-            try:
-                self.sheets_service.spreadsheets().values().clear(
-                    spreadsheetId=spreadsheet_id,
-                    range=f"{sheet_title}!A1:B15",
-                    body={}
-                ).execute()
-            except HttpError as error:
-                print(f"Warning: Failed to clear range before update: {error}")
-            
-            # Обновляем лист документа, используя точное название листа
-            request = self.sheets_service.spreadsheets().values().update(
-                spreadsheetId=spreadsheet_id,
-                range=f"{sheet_title}!A1:B15",  # Увеличиваем диапазон для добавления новых полей
-                valueInputOption="USER_ENTERED",
-                body={"values": project_data}
-            ).execute()
-            
-            return None
-        except HttpError as error:
-            raise Exception(f"Failed to update project info sheet: {error}")
-    
-    def update_specialists_sheet(self, spreadsheet_id: str) -> None:
-        """Set up the specialists sheet headers.
-        
-        Args:
-            spreadsheet_id: ID of the spreadsheet
-            
-        Returns:
-            None
-        """
-        # Prepare specialists header data
-        specialists_headers = [
-            ["ID", "ФИО", "Роль", "Email", "Ставка в час", "Дата начала", "Дата окончания", "Статус"]
-        ]
-        
-        try:
-            # Получаем лист "Team"
-            specialists_sheet = self._get_sheet_by_name(spreadsheet_id, "Team")
-            
-            if not specialists_sheet:
-                raise Exception(f"Failed to find sheet 'Team' in the spreadsheet with ID {spreadsheet_id}")
-                
-            sheet_title = specialists_sheet['properties']['title']
-            
-            # Update the specialists sheet using its exact name
-            request = self.sheets_service.spreadsheets().values().update(
-                spreadsheetId=spreadsheet_id,
-                range=f"{sheet_title}!A1:H1",
-                valueInputOption="USER_ENTERED",
-                body={"values": specialists_headers}
-            ).execute()
-            
-            return None
-        except HttpError as error:
-            raise Exception(f"Failed to update specialists sheet: {error}")
-    
-    def update_periods_sheet(self, spreadsheet_id: str) -> None:
-        """Set up the payment periods sheet headers.
-        
-        Args:
-            spreadsheet_id: ID of the spreadsheet
-            
-        Returns:
-            None
-        """
-        # Prepare payment periods header data
-        periods_headers = [
-            ["ID", "Название периода", "Дата начала", "Дата окончания", "Статус", "Ссылка на отчет"]
-        ]
-        
-        try:
-            # Сначала ищем лист "Periods"
-            periods_sheet = self._get_sheet_by_name(spreadsheet_id, "Periods")
-            
-            # Если не нашли "Periods", ищем "Payment periods"
-            if not periods_sheet:
-                periods_sheet = self._get_sheet_by_name(spreadsheet_id, "Payment periods")
-            
-            if not periods_sheet:
-                raise Exception(f"Failed to find sheet 'Periods' or 'Payment periods' in the spreadsheet with ID {spreadsheet_id}")
-                
-            sheet_title = periods_sheet['properties']['title']
-            
-            # Update the periods sheet using its exact name
-            request = self.sheets_service.spreadsheets().values().update(
-                spreadsheetId=spreadsheet_id,
-                range=f"{sheet_title}!A1:F1",
-                valueInputOption="USER_ENTERED",
-                body={"values": periods_headers}
-            ).execute()
-            
-            return None
-        except HttpError as error:
-            raise Exception(f"Failed to update periods sheet: {error}")
-    
-    def _format_project_info_sheet(self, spreadsheet_id: str) -> None:
-        """Format the project info sheet.
-        
-        Args:
-            spreadsheet_id: ID of the spreadsheet
-            
-        Returns:
-            None
-        """
-        try:
-            # Получаем лист "Project info"
-            project_info_sheet = self._get_sheet_by_name(spreadsheet_id, "Project info")
-            
-            if not project_info_sheet:
-                raise Exception(f"Failed to find sheet 'Project info' in the spreadsheet with ID {spreadsheet_id}")
-            
-            sheet_id = project_info_sheet['properties']['sheetId']
-            
-            format_requests = [
-                # Title formatting
-                {
-                    "repeatCell": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "startRowIndex": 0,
-                            "endRowIndex": 1,
-                            "startColumnIndex": 0,
-                            "endColumnIndex": 8
-                        },
-                        "cell": {
-                            "userEnteredFormat": {
-                                "textFormat": {
-                                    "fontSize": 14,
-                                    "bold": True
-                                },
-                                "backgroundColor": {
-                                    "red": 0.95,
-                                    "green": 0.95,
-                                    "blue": 0.95
-                                }
-                            }
-                        },
-                        "fields": "userEnteredFormat(textFormat,backgroundColor)"
-                    }
-                },
-                # Section headers formatting
-                {
-                    "repeatCell": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "startRowIndex": 5,
-                            "endRowIndex": 6,
-                            "startColumnIndex": 0,
-                            "endColumnIndex": 8
-                        },
-                        "cell": {
-                            "userEnteredFormat": {
-                                "textFormat": {
-                                    "bold": True
-                                },
-                                "backgroundColor": {
-                                    "red": 0.95,
-                                    "green": 0.95,
-                                    "blue": 0.95
-                                }
-                            }
-                        },
-                        "fields": "userEnteredFormat(textFormat,backgroundColor)"
-                    }
-                },
-                {
-                    "repeatCell": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "startRowIndex": 10,
-                            "endRowIndex": 11,
-                            "startColumnIndex": 0,
-                            "endColumnIndex": 8
-                        },
-                        "cell": {
-                            "userEnteredFormat": {
-                                "textFormat": {
-                                    "bold": True
-                                },
-                                "backgroundColor": {
-                                    "red": 0.95,
-                                    "green": 0.95,
-                                    "blue": 0.95
-                                }
-                            }
-                        },
-                        "fields": "userEnteredFormat(textFormat,backgroundColor)"
-                    }
-                },
-                # Форматирование для раздела "Связанные документы"
-                {
-                    "repeatCell": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "startRowIndex": 18,  # Примерная позиция для раздела "Связанные документы"
-                            "endRowIndex": 19,
-                            "startColumnIndex": 0,
-                            "endColumnIndex": 8
-                        },
-                        "cell": {
-                            "userEnteredFormat": {
-                                "textFormat": {
-                                    "bold": True
-                                },
-                                "backgroundColor": {
-                                    "red": 0.95,
-                                    "green": 0.95,
-                                    "blue": 0.95
-                                }
-                            }
-                        },
-                        "fields": "userEnteredFormat(textFormat,backgroundColor)"
-                    }
-                },
-                # Заголовки таблицы связанных документов
-                {
-                    "repeatCell": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "startRowIndex": 20,  # Заголовки столбцов
-                            "endRowIndex": 21,
-                            "startColumnIndex": 0,
-                            "endColumnIndex": 2
-                        },
-                        "cell": {
-                            "userEnteredFormat": {
-                                "textFormat": {
-                                    "bold": True
-                                },
-                                "backgroundColor": {
-                                    "red": 0.95,
-                                    "green": 0.95,
-                                    "blue": 0.95
-                                }
-                            }
-                        },
-                        "fields": "userEnteredFormat(textFormat,backgroundColor)"
-                    }
-                },
-                # Field labels formatting
-                {
-                    "repeatCell": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "startRowIndex": 2,
-                            "endRowIndex": 17,
-                            "startColumnIndex": 0,
-                            "endColumnIndex": 1
-                        },
-                        "cell": {
-                            "userEnteredFormat": {
-                                "textFormat": {
-                                    "bold": True
-                                }
-                            }
-                        },
-                        "fields": "userEnteredFormat(textFormat)"
-                    }
-                }
-            ]
-            
-            # Execute the formatting requests
-            self.sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=spreadsheet_id,
-                body={"requests": format_requests}
-            ).execute()
-            
-            return None
-        except HttpError as error:
-            raise Exception(f"Failed to format project info sheet: {error}")
-    
-    def _format_specialists_sheet(self, spreadsheet_id: str) -> None:
-        """Format the specialists sheet.
-        
-        Args:
-            spreadsheet_id: ID of the spreadsheet
-            
-        Returns:
-            None
-        """
-        try:
-            # Получаем лист "Team"
-            specialists_sheet = self._get_sheet_by_name(spreadsheet_id, "Team")
-            
-            if not specialists_sheet:
-                raise Exception(f"Failed to find sheet 'Team' in the spreadsheet with ID {spreadsheet_id}")
-            
-            sheet_id = specialists_sheet['properties']['sheetId']
-            
-            format_requests = [
-                # Headers formatting
-                {
-                    "repeatCell": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "startRowIndex": 0,
-                            "endRowIndex": 1,
-                            "startColumnIndex": 0,
-                            "endColumnIndex": 8
-                        },
-                        "cell": {
-                            "userEnteredFormat": {
-                                "textFormat": {
-                                    "bold": True
-                                },
-                                "backgroundColor": {
-                                    "red": 0.95,
-                                    "green": 0.95,
-                                    "blue": 0.95
-                                }
-                            }
-                        },
-                        "fields": "userEnteredFormat(textFormat,backgroundColor)"
-                    }
-                }
-            ]
-            
-            # Execute the formatting requests
-            self.sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=spreadsheet_id,
-                body={"requests": format_requests}
-            ).execute()
-            
-            return None
-        except HttpError as error:
-            raise Exception(f"Failed to format specialists sheet: {error}")
-    
-    def _format_periods_sheet(self, spreadsheet_id: str) -> None:
-        """Format the payment periods sheet.
-        
-        Args:
-            spreadsheet_id: ID of the spreadsheet
-            
-        Returns:
-            None
-        """
-        try:
-            # Сначала ищем лист "Periods"
-            periods_sheet = self._get_sheet_by_name(spreadsheet_id, "Periods")
-            
-            # Если не нашли "Periods", ищем "Payment periods"
-            if not periods_sheet:
-                periods_sheet = self._get_sheet_by_name(spreadsheet_id, "Payment periods")
-            
-            if not periods_sheet:
-                raise Exception(f"Failed to find sheet 'Periods' or 'Payment periods' in the spreadsheet with ID {spreadsheet_id}")
-            
-            sheet_id = periods_sheet['properties']['sheetId']
-            
-            format_requests = [
-                # Headers formatting
-                {
-                    "repeatCell": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "startRowIndex": 0,
-                            "endRowIndex": 1,
-                            "startColumnIndex": 0,
-                            "endColumnIndex": 6
-                        },
-                        "cell": {
-                            "userEnteredFormat": {
-                                "textFormat": {
-                                    "bold": True
-                                },
-                                "backgroundColor": {
-                                    "red": 0.95,
-                                    "green": 0.95,
-                                    "blue": 0.95
-                                }
-                            }
-                        },
-                        "fields": "userEnteredFormat(textFormat,backgroundColor)"
-                    }
-                }
-            ]
-            
-            # Execute the formatting requests
-            self.sheets_service.spreadsheets().batchUpdate(
-                spreadsheetId=spreadsheet_id,
-                body={"requests": format_requests}
-            ).execute()
-            
-            return None
-        except HttpError as error:
-            raise Exception(f"Failed to format periods sheet: {error}")
-    
-    def create_project_metadata(self, project_meta: ProjectMeta) -> Dict[str, str]:
-        """Create a Google Sheets document with project metadata.
-        
-        Args:
-            project_meta: Project metadata
-            
-        Returns:
-            Dictionary with spreadsheet ID, URL, and project ID
-        """
-        # Generate a unique ID for the project
-        project_id = generate_uuid()
-        
-        # Create a new spreadsheet
-        spreadsheet_info = self.create_spreadsheet(f"Проект: {project_meta.name}")
-        
-        # Update project info sheet
-        self.update_project_info_sheet(spreadsheet_info["spreadsheet_id"], project_meta)
-        
-        # Set up specialists sheet
-        self.update_specialists_sheet(spreadsheet_info["spreadsheet_id"])
-        
-        # Set up payment periods sheet
-        self.update_periods_sheet(spreadsheet_info["spreadsheet_id"])
-        
-        # If a drive folder ID is provided, move the spreadsheet to that folder
-        drive_folder_url = None
-        if project_meta.drive_folder_id:
-            try:
-                # Move the spreadsheet to the specified folder
-                self.drive_service.files().update(
-                    fileId=spreadsheet_info["spreadsheet_id"],
-                    addParents=project_meta.drive_folder_id,
-                    removeParents="root",
-                    fields="id, parents"
-                ).execute()
-                
-                drive_folder_url = f"https://drive.google.com/drive/folders/{project_meta.drive_folder_id}"
-            except HttpError as error:
-                # Log the error but continue (non-critical)
-                print(f"Failed to move spreadsheet to folder: {error}")
-        
-        return {
-            "project_id": project_id,
-            "spreadsheet_id": spreadsheet_info["spreadsheet_id"],
-            "spreadsheet_url": spreadsheet_info["spreadsheet_url"],
-            "drive_folder_id": project_meta.drive_folder_id,
-            "drive_folder_url": drive_folder_url
-        }
-    
     def create_drive_folder(self, folder_name: str, parent_folder_id: Optional[str] = None) -> Dict[str, str]:
         """Create a folder in Google Drive.
         
@@ -787,11 +244,11 @@ class GoogleSheetsService:
         except Exception as e:
             raise Exception(f"Failed to copy spreadsheet: {e}")
     
-    def create_project(self, project_meta: ProjectMeta) -> Dict[str, str]:
+    def create_project(self, project: Project) -> Dict[str, str]:
         """Create a project in Google Drive with all required components.
         
         Args:
-            project_meta: Project metadata with at least the name
+            project: Project object with at least the name
             
         Returns:
             Dictionary with project details including IDs and URLs
@@ -800,9 +257,10 @@ class GoogleSheetsService:
             raise Exception("Google services are not initialized. Please check your credentials and scopes.")
             
         try:
-            # Generate a unique ID for the project
-            project_id = generate_uuid()
-            project_name = project_meta.name
+            # Generate a unique ID for the project if not provided
+            if not project.id:
+                project.id = generate_uuid()
+            project_name = project.name
             
             print(f"Creating project: {project_name}")
             
@@ -895,16 +353,14 @@ class GoogleSheetsService:
             )
             print(f"Created calculations spreadsheet: {project_name} - Payment Distribution (ID: {calculations.get('spreadsheet_id')})")
             
-            # Обновляем информацию о проекте, добавляя ссылки на созданные документы
-            # Создаем обновленный объект ProjectMeta с ссылками на другие документы
-            updated_project_meta = ProjectMeta(
-                name=project_name,
-                drive_folder_id=project_folder_id,
-                calculations_url=calculations["spreadsheet_url"],
-                report_url=report["spreadsheet_url"]
-            )
+            # Update project with information about created resources
+            project.drive_folder_id = project_folder_id
+            project.project_info_spreadsheet_id = project_info["spreadsheet_id"]
+            project.report_spreadsheet_id = report["spreadsheet_id"]
+            project.calculations_spreadsheet_id = calculations["spreadsheet_id"]
+            project.modified = datetime.utcnow()
             
-            # Обновляем основную информацию о проекте
+            # Update main project information
             print(f"Updating project info with links to related documents:")
             print(f"  - Project name: {project_name}")
             print(f"  - Project info URL: {project_info['spreadsheet_url']}")
@@ -912,12 +368,12 @@ class GoogleSheetsService:
             print(f"  - Calculations URL: {calculations['spreadsheet_url']}")
             print(f"  - Report URL: {report['spreadsheet_url']}")
             
-            self.update_project_info_sheet(project_info["spreadsheet_id"], updated_project_meta)
+            update_project_info_sheet(self.sheets_service, project_info["spreadsheet_id"], project)
             print(f"Project info updated successfully")
             
             # Return all information about the created project
             return {
-                "project_id": project_id,
+                "project_id": project.id,
                 "drive_folder_id": project_folder_id,
                 "drive_folder_url": folder_info["folder_url"],
                 "project_info_spreadsheet_id": project_info["spreadsheet_id"],

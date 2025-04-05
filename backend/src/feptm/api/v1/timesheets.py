@@ -1,42 +1,46 @@
-"""API endpoints for timesheets."""
+"""API endpoints for time entries."""
 
-from fastapi import APIRouter, HTTPException, Query
-from datetime import datetime
+from fastapi import APIRouter, Query, HTTPException, Path
 from typing import List, Optional
+from datetime import datetime
+from pydantic import BaseModel
 
-from feptm.models.payment import TimeEntry
-from feptm.services.mock_data_service import mock_data_service
+from feptm.core.config import settings
 
 router = APIRouter()
 
 
-@router.get("/time-entries", response_model=List[TimeEntry])
+class TimeEntry(BaseModel):
+    """Time entry model."""
+    
+    id: str
+    date: datetime
+    specialist_id: str
+    project_id: str
+    hours: float
+    description: str
+
+
+@router.get("/", response_model=List[TimeEntry])
 async def get_time_entries(
+    period_id: Optional[str] = Query(None, description="Filter by payment period ID"),
     specialist_id: Optional[str] = Query(None, description="Filter by specialist ID"),
     project_id: Optional[str] = Query(None, description="Filter by project ID"),
-    start_date: Optional[datetime] = Query(None, description="Filter entries after this date"),
-    end_date: Optional[datetime] = Query(None, description="Filter entries before this date")
+    date_from: Optional[datetime] = Query(None, description="Filter by start date"),
+    date_to: Optional[datetime] = Query(None, description="Filter by end date")
 ):
     """Get time entries with optional filtering.
     
     Args:
-        specialist_id: Filter by specialist ID
-        project_id: Filter by project ID
-        start_date: Filter entries after this date
-        end_date: Filter entries before this date
+        period_id: Optional payment period ID filter
+        specialist_id: Optional specialist ID filter
+        project_id: Optional project ID filter
+        date_from: Optional start date filter
+        date_to: Optional end date filter
     
     Returns:
-        List of time entries matching the filters
+        List of time entries matching the criteria
     """
-    filters = {
-        "specialist_id": specialist_id,
-        "project_id": project_id,
-        "start_date": start_date,
-        "end_date": end_date
-    }
-    
-    # Remove None values
-    filters = {k: v for k, v in filters.items() if v is not None}
-    
-    entries = mock_data_service.get_filtered_data("time_entries", filters)
-    return entries 
+    # Note: This is a stub that needs to be implemented with real data
+    # TODO: Implement actual time entry retrieval from database
+    return [] 

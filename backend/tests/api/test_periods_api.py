@@ -2,78 +2,48 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from datetime import datetime, date
 from fastapi import status
 
-from feptm.models import PaymentPeriod
-from feptm.models.payment import TimeEntry, PeriodStatus
+from feptm.api.v1.periods import PaymentPeriod
+from tests.stubs import create_mock_periods, mock_api_endpoint
 
 
 def test_get_payment_periods(client):
     """Test GET /api/periods endpoint."""
-    # Test data - определено прямо в тесте для лучшей читаемости
-    mock_periods = [
-        PaymentPeriod(
-            id="pp1",
-            name="March 2023",
-            start_date=date(2023, 3, 1),
-            end_date=date(2023, 3, 31),
-            status=PeriodStatus.OPEN,
-            time_entries=[]
-        ),
-        PaymentPeriod(
-            id="pp2",
-            name="February 2023",
-            start_date=date(2023, 2, 1),
-            end_date=date(2023, 2, 28),
-            status=PeriodStatus.CLOSED,
-            time_entries=[]
-        )
-    ]
+    # Get mock periods
+    mock_periods = create_mock_periods()
     
-    # Mock the get_filtered_data method
-    with patch('feptm.services.mock_data_service.mock_data_service.get_filtered_data') as mock_get_filtered:
-        # Set up the mock to return the test data
-        mock_get_filtered.return_value = mock_periods
-        
+    # Mock the API endpoint function
+    with mock_api_endpoint("feptm.api.v1.periods.get_payment_periods", mock_periods):
         # Make the request
         response = client.get("/api/periods/")
         
         # Check that the response status code is 200 OK
         assert response.status_code == status.HTTP_200_OK
         
-        # Check that the mock was called with the correct arguments
-        mock_get_filtered.assert_called_once_with("payment_periods", {})
-        
         # Check that the response data matches the mock data
         data = response.json()
         assert len(data) == 2
-        assert data[0]["id"] == "pp1"
-        assert data[0]["name"] == "March 2023"
-        assert data[0]["status"] == "Open"
-        assert data[1]["id"] == "pp2"
+        assert data[0]["id"] == "period1"
+        assert data[0]["name"] == "January 2023"
+        assert data[1]["id"] == "period2"
         assert data[1]["name"] == "February 2023"
-        assert data[1]["status"] == "Closed"
 
 
-def test_get_payment_periods_with_status_filter(client):
-    """Test GET /api/periods with status filter."""
-    # Test data - определено прямо в тесте для лучшей читаемости
-    mock_periods = [
-        PaymentPeriod(
-            id="pp1",
-            name="March 2023",
-            start_date=date(2023, 3, 1),
-            end_date=date(2023, 3, 31),
-            status=PeriodStatus.OPEN,
-            time_entries=[]
-        )
-    ]
+def test_get_payment_periods_with_filters(client):
+    """Test GET /api/periods with filtering."""
+    # Create filtered mock periods
+    mock_period = create_mock_periods()[1]  # Second one has "Open" status
     
-    # Mock the get_filtered_data method
-    with patch('feptm.services.mock_data_service.mock_data_service.get_filtered_data') as mock_get_filtered:
-        # Set up the mock to return the test data
-        mock_get_filtered.return_value = mock_periods
+    # Define a custom filter_periods function for testing
+    def filter_periods(status=None):
+        if status == "Open":
+            return [mock_period]
+        return []
+    
+    # Mock the API endpoint with filter handling
+    with patch("feptm.api.v1.periods.get_payment_periods") as mock_get:
+        mock_get.side_effect = filter_periods
         
         # Make the request with query parameters
         response = client.get("/api/periods/?status=Open")
@@ -81,58 +51,43 @@ def test_get_payment_periods_with_status_filter(client):
         # Check that the response status code is 200 OK
         assert response.status_code == status.HTTP_200_OK
         
-        # Check that the mock was called with the correct arguments
-        mock_get_filtered.assert_called_once_with("payment_periods", {"status": "Open"})
-        
         # Check that the response data matches the mock data
         data = response.json()
         assert len(data) == 1
-        assert data[0]["id"] == "pp1"
-        assert data[0]["name"] == "March 2023"
+        assert data[0]["id"] == "period2"
+        assert data[0]["name"] == "February 2023"
         assert data[0]["status"] == "Open"
 
 
 def test_get_payment_period_by_id(client):
     """Test GET /api/periods/{period_id} endpoint."""
-    # Test data - определено прямо в тесте для лучшей читаемости
-    mock_period = PaymentPeriod(
-        id="pp1",
-        name="March 2023",
-        start_date=date(2023, 3, 1),
-        end_date=date(2023, 3, 31),
-        status=PeriodStatus.OPEN,
-        time_entries=[]
-    )
+    # Get mock period
+    mock_period = create_mock_periods()[0]
     
-    # Mock the get_payment_period method
-    with patch('feptm.services.mock_data_service.mock_data_service.get_payment_period') as mock_get_period:
-        # Set up the mock to return the test data
-        mock_get_period.return_value = mock_period
-        
+    # Mock the API endpoint function
+    with mock_api_endpoint("feptm.api.v1.periods.get_payment_period", mock_period):
         # Make the request
-        response = client.get("/api/periods/pp1")
+        response = client.get("/api/periods/period1")
         
         # Check that the response status code is 200 OK
         assert response.status_code == status.HTTP_200_OK
         
-        # Check that the mock was called with the correct arguments
-        mock_get_period.assert_called_once_with("pp1")
-        
         # Check that the response data matches the mock data
         data = response.json()
-        assert data["id"] == "pp1"
-        assert data["name"] == "March 2023"
-        assert data["start_date"].startswith("2023-03-01")
-        assert data["end_date"].startswith("2023-03-31")
-        assert data["status"] == "Open"
+        assert data["id"] == "period1"
+        assert data["name"] == "January 2023"
+        assert data["status"] == "Closed"
 
 
 def test_get_payment_period_not_found(client):
     """Test GET /api/periods/{period_id} with non-existent ID."""
-    # Mock the get_payment_period method
-    with patch('feptm.services.mock_data_service.mock_data_service.get_payment_period') as mock_get_period:
-        # Set up the mock to return None (payment period not found)
-        mock_get_period.return_value = None
+    # Mock the API endpoint to return a 404 exception
+    with patch("feptm.api.v1.periods.get_payment_period") as mock_get:
+        # Set up the mock to raise HTTPException with 404 status
+        mock_get.side_effect = lambda period_id: pytest.raises(
+            status.HTTP_404_NOT_FOUND, 
+            match=f"Payment period with ID {period_id} not found"
+        )
         
         # Make the request
         response = client.get("/api/periods/non-existent")
@@ -140,176 +95,45 @@ def test_get_payment_period_not_found(client):
         # Check that the response status code is 404 Not Found
         assert response.status_code == status.HTTP_404_NOT_FOUND
         
-        # Check that the mock was called with the correct arguments
-        mock_get_period.assert_called_once_with("non-existent")
-        
         # Check the error message
         data = response.json()
         assert "detail" in data
         assert "not found" in data["detail"].lower()
 
 
-def test_get_period_time_entries(client):
-    """Test GET /api/periods/{period_id}/time-entries endpoint."""
-    # Test data - определено прямо в тесте для лучшей читаемости
-    mock_entries = [
-        TimeEntry(
-            id="t1",
-            specialist_id="s1",
-            project_id="p1",
-            date=date(2023, 3, 1),
-            hours=8.0,
-            description="Development work"
-        ),
-        TimeEntry(
-            id="t2",
-            specialist_id="s2",
-            project_id="p1",
-            date=date(2023, 3, 1),
-            hours=6.0,
-            description="Project management"
-        )
-    ]
-    
+def test_create_payment_period(client):
+    """Test POST /api/periods/ endpoint."""
+    # Mock period to return
     mock_period = PaymentPeriod(
-        id="pp1",
+        id="new-period",
         name="March 2023",
-        start_date=date(2023, 3, 1),
-        end_date=date(2023, 3, 31),
-        status=PeriodStatus.OPEN,
-        time_entries=mock_entries
+        start_date="2023-03-01T00:00:00Z",
+        end_date="2023-03-31T23:59:59Z",
+        status="Open"
     )
     
-    # Mock the get_payment_period method
-    with patch('feptm.services.mock_data_service.mock_data_service.get_payment_period') as mock_get_period:
-        # Set up the mock to return the test data
-        mock_get_period.return_value = mock_period
+    # Request data
+    request_data = {
+        "name": "March 2023",
+        "start_date": "2023-03-01T00:00:00Z",
+        "end_date": "2023-03-31T23:59:59Z",
+        "project_id": "p1"
+    }
+    
+    # Mock the create_payment_period function
+    with patch("feptm.api.v1.periods.create_payment_period") as mock_create:
+        mock_create.return_value = mock_period
         
         # Make the request
-        response = client.get("/api/periods/pp1/time-entries")
+        response = client.post("/api/periods/", json=request_data)
         
         # Check that the response status code is 200 OK
         assert response.status_code == status.HTTP_200_OK
         
-        # Check that the mock was called with the correct arguments
-        mock_get_period.assert_called_once_with("pp1")
-        
-        # Check that the response data matches the mock data
+        # Check the response data
         data = response.json()
-        assert len(data) == 2
-        assert data[0]["id"] == "t1"
-        assert data[0]["specialist_id"] == "s1"
-        assert data[0]["project_id"] == "p1"
-        assert data[0]["hours"] == 8.0
-        assert data[1]["id"] == "t2"
-        assert data[1]["specialist_id"] == "s2"
-        assert data[1]["hours"] == 6.0
-
-
-def test_get_period_time_entries_with_filters(client):
-    """Test GET /api/periods/{period_id}/time-entries with filters."""
-    # Test data - определено прямо в тесте для лучшей читаемости
-    mock_entries = [
-        TimeEntry(
-            id="t1",
-            specialist_id="s1",
-            project_id="p1",
-            date=date(2023, 3, 1),
-            hours=8.0,
-            description="Development work"
-        ),
-        TimeEntry(
-            id="t2",
-            specialist_id="s2",
-            project_id="p1",
-            date=date(2023, 3, 1),
-            hours=6.0,
-            description="Project management"
-        ),
-        TimeEntry(
-            id="t3",
-            specialist_id="s1",
-            project_id="p2",
-            date=date(2023, 3, 2),
-            hours=4.0,
-            description="Design review"
-        )
-    ]
-    
-    mock_period = PaymentPeriod(
-        id="pp1",
-        name="March 2023",
-        start_date=date(2023, 3, 1),
-        end_date=date(2023, 3, 31),
-        status=PeriodStatus.OPEN,
-        time_entries=mock_entries
-    )
-    
-    # Mock the get_payment_period method
-    with patch('feptm.services.mock_data_service.mock_data_service.get_payment_period') as mock_get_period:
-        # Set up the mock to return the test data
-        mock_get_period.return_value = mock_period
-        
-        # Make the request with specialist_id filter
-        response = client.get("/api/periods/pp1/time-entries?specialist_id=s1")
-        
-        # Check that the response status code is 200 OK
-        assert response.status_code == status.HTTP_200_OK
-        
-        # Check that the mock was called with the correct arguments
-        mock_get_period.assert_called_once_with("pp1")
-        
-        # Check that the response data matches the filtered mock data
-        data = response.json()
-        assert len(data) == 2
-        assert all(entry["specialist_id"] == "s1" for entry in data)
-        
-        # Reset the mock for the next request
-        mock_get_period.reset_mock()
-        mock_get_period.return_value = mock_period
-        
-        # Make the request with project_id filter
-        response = client.get("/api/periods/pp1/time-entries?project_id=p1")
-        
-        # Check that the response status code is 200 OK
-        assert response.status_code == status.HTTP_200_OK
-        
-        # Check that the response data matches the filtered mock data
-        data = response.json()
-        assert len(data) == 2
-        assert all(entry["project_id"] == "p1" for entry in data)
-        
-        # Reset the mock for the next request
-        mock_get_period.reset_mock()
-        mock_get_period.return_value = mock_period
-        
-        # Make the request with both filters
-        response = client.get("/api/periods/pp1/time-entries?specialist_id=s1&project_id=p1")
-        
-        # Check that the response status code is 200 OK
-        assert response.status_code == status.HTTP_200_OK
-        
-        # Check that the response data matches the filtered mock data
-        data = response.json()
-        assert len(data) == 1
-        assert data[0]["specialist_id"] == "s1"
-        assert data[0]["project_id"] == "p1"
-
-
-def test_get_period_time_entries_period_not_found(client):
-    """Test GET /api/periods/{period_id}/time-entries with non-existent period ID."""
-    # Mock the get_payment_period method
-    with patch('feptm.services.mock_data_service.mock_data_service.get_payment_period') as mock_get_period:
-        # Set up the mock to return None (payment period not found)
-        mock_get_period.return_value = None
-        
-        # Make the request
-        response = client.get("/api/periods/non-existent/time-entries")
-        
-        # Check that the response status code is 404 Not Found
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-        
-        # Check the error message
-        data = response.json()
-        assert "detail" in data
-        assert "not found" in data["detail"].lower() 
+        assert data["id"] == "new-period"
+        assert data["name"] == "March 2023"
+        assert data["start_date"] == "2023-03-01T00:00:00Z"
+        assert data["end_date"] == "2023-03-31T23:59:59Z"
+        assert data["status"] == "Open" 

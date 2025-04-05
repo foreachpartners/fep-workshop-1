@@ -4,8 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Path
 from typing import List, Optional
 from pydantic import BaseModel
 
-from feptm.models import Project, ProjectMeta, ProjectMetaResponse
-from feptm.services.mock_data_service import mock_data_service
+from feptm.models import Project, ProjectMetaResponse
 from feptm.services.google_sheets_service import google_sheets_service
 from feptm.core.config import settings
 
@@ -13,27 +12,15 @@ router = APIRouter()
 
 
 @router.get("/", response_model=List[Project])
-async def get_projects(
-    status: Optional[str] = Query(None, description="Filter by status"),
-    project_type: Optional[str] = Query(None, description="Filter by project type")
-):
-    """Get all projects with optional filtering.
-    
-    Args:
-        status: Filter by project status
-        project_type: Filter by project type
+async def get_projects():
+    """Get all projects.
     
     Returns:
         List of projects
     """
-    filters = {}
-    if status is not None:
-        filters["status"] = status
-    if project_type is not None:
-        filters["project_type"] = project_type
-        
-    projects = mock_data_service.get_filtered_data("projects", filters)
-    return projects
+    # Note: This is a stub that needs to be implemented with real data
+    # TODO: Implement actual project retrieval from database
+    return []
 
 
 @router.get("/{project_id}", response_model=Project)
@@ -51,10 +38,9 @@ async def get_project(
     Raises:
         HTTPException: If project not found
     """
-    project = mock_data_service.get_project(project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail=f"Project with ID {project_id} not found")
-    return project
+    # Note: This is a stub that needs to be implemented with real data
+    # TODO: Implement actual project retrieval from database
+    raise HTTPException(status_code=404, detail=f"Project with ID {project_id} not found")
 
 
 class ProjectCreateRequest(BaseModel):
@@ -82,14 +68,7 @@ async def create_project(request: ProjectCreateRequest):
         HTTPException: If creation fails
     """
     try:
-        # Validate configuration - проверяем наличие необходимых настроек
-        # GOOGLE_PROJECTS_FOLDER_ID больше не обязательный параметр
-        # if not settings.GOOGLE_PROJECTS_FOLDER_ID:
-        #    raise HTTPException(
-        #        status_code=500, 
-        #        detail="GOOGLE_PROJECTS_FOLDER_ID not configured. Please set this value in the environment variables."
-        #    )
-        
+        # Validate configuration
         if not settings.GOOGLE_PROJECT_INFO_TEMPLATE_ID:
             raise HTTPException(
                 status_code=500, 
@@ -108,11 +87,11 @@ async def create_project(request: ProjectCreateRequest):
                 detail="GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID not configured. Please set this value in the environment variables."
             )
         
-        # Create minimal ProjectMeta with just the name
-        project_meta = ProjectMeta(name=request.project_name)
+        # Create minimal Project with just the name
+        project = Project(name=request.project_name)
         
         # Create project in Google Drive
-        result = google_sheets_service.create_project(project_meta)
+        result = google_sheets_service.create_project(project)
         
         # Return the response
         return ProjectMetaResponse(

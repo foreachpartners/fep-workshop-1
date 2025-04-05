@@ -34,12 +34,12 @@ class Settings(BaseSettings):
     GOOGLE_REPORT_TEMPLATE_ID: Optional[str] = None
     
     # Google Drive settings for projects
-    # Важно: убедитесь, что все эти файлы доступны для пользователя,
-    # аутентифицированного через OAuth (настройте "Доступ по ссылке")
-    GOOGLE_PROJECTS_FOLDER_ID: Optional[str] = None # Укажите здесь ID папки в Google Drive
+    # Important: make sure all these files are accessible to the user
+    # authenticated via OAuth (enable "Share by link" access)
+    GOOGLE_PROJECTS_FOLDER_ID: Optional[str] = None # Specify the Google Drive folder ID here
     
-    # Шаблоны Google Sheets - укажите здесь свои идентификаторы или обновите переменные среды
-    # Чтобы шаблоны были доступны, для них должен быть включен "Доступ по ссылке" (Share > General Access)
+    # Google Sheets templates - specify your identifiers here or update environment variables
+    # To make templates accessible, "Share by link" must be enabled for them (Share > General Access)
     GOOGLE_PROJECT_INFO_TEMPLATE_ID: Optional[str] = None 
     GOOGLE_PROJECT_REPORT_TEMPLATE_ID: Optional[str] = None 
     GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID: Optional[str] = None

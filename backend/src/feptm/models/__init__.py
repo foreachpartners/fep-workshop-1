@@ -1,7 +1,5 @@
 """Model definitions for the application."""
 
-from feptm.models.specialist import Specialist
-from feptm.models.project import Project, ProjectMeta, ProjectMetaResponse
-from feptm.models.payment import PaymentPeriod
+from feptm.models.project import Project, ProjectMetaResponse
 
-__all__ = ["Specialist", "Project", "ProjectMeta", "ProjectMetaResponse", "PaymentPeriod"] 
+__all__ = ["Project", "ProjectMetaResponse"] 

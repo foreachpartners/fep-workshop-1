@@ -1,18 +1,13 @@
 """Tests for the root API endpoint."""
 
+import pytest
 from fastapi import status
 
 
 def test_root_endpoint(client):
-    """Test GET / endpoint."""
-    response = client.get("/")
+    """Test that the root endpoint returns a welcome message."""
+    response = client.get("/api/")
     
-    # Check that the response status code is 200 OK
     assert response.status_code == status.HTTP_200_OK
-    
-    # Check that the response data contains expected fields
-    data = response.json()
-    assert "status" in data
-    assert data["status"] == "ok"
-    assert "message" in data
-    assert "Time & Materials accounting service is running" in data["message"] 
+    assert "message" in response.json()
+    assert "welcome" in response.json()["message"].lower() 

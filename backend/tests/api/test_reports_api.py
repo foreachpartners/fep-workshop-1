@@ -5,10 +5,7 @@ from unittest.mock import patch, MagicMock
 from datetime import date
 from fastapi import status
 
-from feptm.models import PaymentPeriod, Specialist, Project
-from feptm.models.payment import TimeEntry, PeriodStatus
-from feptm.models.specialist import SpecialistRole
-from feptm.models.project import ProjectStatus, ProjectType
+from feptm.models import Project
 from feptm.api.v1.reports import SpecialistReport, ProjectReport
 
 
@@ -296,20 +293,18 @@ def test_get_project_reports_no_period(client):
         Project(
             id="p1",
             name="Project Alpha",
-            description="Test project",
-            client_name="Client A",
-            status=ProjectStatus.ACTIVE,
-            project_type=ProjectType.TIME_AND_MATERIALS,
-            start_date="2023-02-01T00:00:00Z"
+            drive_folder_id="folder-1",
+            project_info_spreadsheet_id="info-1",
+            report_spreadsheet_id="report-1",
+            calculations_spreadsheet_id="calc-1"
         ),
         Project(
             id="p2",
             name="Project Beta",
-            description="Test project",
-            client_name="Client B",
-            status=ProjectStatus.ACTIVE,
-            project_type=ProjectType.TIME_AND_MATERIALS,
-            start_date="2023-01-15T00:00:00Z"
+            drive_folder_id="folder-2",
+            project_info_spreadsheet_id="info-2",
+            report_spreadsheet_id="report-2",
+            calculations_spreadsheet_id="calc-2"
         )
     ]
     
@@ -430,20 +425,18 @@ def test_get_project_reports_with_period(client):
         Project(
             id="p1",
             name="Project Alpha",
-            description="Test project",
-            client_name="Client A",
-            status=ProjectStatus.ACTIVE,
-            project_type=ProjectType.TIME_AND_MATERIALS,
-            start_date="2023-02-01T00:00:00Z"
+            drive_folder_id="folder-1",
+            project_info_spreadsheet_id="info-1",
+            report_spreadsheet_id="report-1",
+            calculations_spreadsheet_id="calc-1"
         ),
         Project(
             id="p2",
             name="Project Beta",
-            description="Test project",
-            client_name="Client B",
-            status=ProjectStatus.ACTIVE,
-            project_type=ProjectType.TIME_AND_MATERIALS,
-            start_date="2023-01-15T00:00:00Z"
+            drive_folder_id="folder-2",
+            project_info_spreadsheet_id="info-2",
+            report_spreadsheet_id="report-2",
+            calculations_spreadsheet_id="calc-2"
         )
     ]
     
