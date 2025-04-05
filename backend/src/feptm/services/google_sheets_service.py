@@ -12,14 +12,6 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 from feptm.core.config import settings
-from feptm.core.utils import generate_uuid
-from feptm.models import Project
-from feptm.services.google_sheets_helper import find_credentials_file, get_sheet_by_name
-from feptm.services.google_sheets_business import (
-    update_project_info_sheet,
-    format_project_info_sheet,
-    create_project_metadata
-)
 
 
 class GoogleSheetsService:
@@ -27,11 +19,36 @@ class GoogleSheetsService:
 
     def __init__(self):
         """Initialize service with credentials."""
-        self.credentials_file = settings.GOOGLE_CREDENTIALS_FILE or find_credentials_file()
+        self.credentials_file = settings.GOOGLE_CREDENTIALS_FILE or self._find_credentials_file()
         self.token_file = settings.GOOGLE_TOKEN_FILE or Path.home() / ".google_sheets_token.json"
         self.sheets_service = None
         self.drive_service = None
         self.initialize()
+    
+    def _find_credentials_file(self) -> str:
+        """Find the credentials file in default locations.
+        
+        Returns:
+            Path to the credentials file
+            
+        Raises:
+            FileNotFoundError: If no credentials file can be found
+        """
+        default_locations = [
+            "backend/credentials.json",
+        ]
+        
+        # Check default locations
+        for location in default_locations:
+            if Path(location).is_file():
+                return str(location)
+        
+        # If we get here, no credentials file was found
+        locations_str = "\n- ".join([""] + default_locations)
+        raise FileNotFoundError(
+            f"Could not find Google API credentials file. "
+            f"Please place credentials.json in one of the following locations:{locations_str}"
+        )
 
     def initialize(self) -> bool:
         """Initialize the Google Drive and Sheets API services.
@@ -137,6 +154,48 @@ class GoogleSheetsService:
             }
         except HttpError as error:
             raise Exception(f"Failed to create spreadsheet: {error}")
+
+    def get_sheet_by_name(self, spreadsheet_id: str, sheet_name: str) -> Optional[Dict[str, Any]]:
+        """Finds a sheet in the spreadsheet by its name.
+        
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            sheet_name: Name of the sheet to find
+            
+        Returns:
+            Dictionary with information about the found sheet or None if not found
+        """
+        try:
+            # Get spreadsheet metadata
+            spreadsheet_metadata = self.sheets_service.spreadsheets().get(
+                spreadsheetId=spreadsheet_id
+            ).execute()
+            
+            # Get list of sheets
+            sheets = spreadsheet_metadata.get('sheets', [])
+            if not sheets:
+                print(f"Warning: No sheets found in the spreadsheet with ID {spreadsheet_id}")
+                return None
+            
+            # Find sheet with specified name
+            target_sheet = None
+            available_sheets = []
+            for sheet in sheets:
+                sheet_title = sheet['properties']['title']
+                available_sheets.append(sheet_title)
+                if sheet_title == sheet_name:
+                    target_sheet = sheet
+                    break
+            
+            if not target_sheet:
+                print(f"Warning: Sheet '{sheet_name}' not found. Available sheets: {', '.join(available_sheets)}")
+                return None
+            
+            return target_sheet
+                
+        except Exception as error:
+            print(f"Error getting sheet by name: {error}")
+            return None
 
     def _get_sheet_ids(self, spreadsheet_id: str) -> Dict[str, int]:
         """Get sheet IDs for the given spreadsheet.
@@ -244,155 +303,295 @@ class GoogleSheetsService:
         except Exception as e:
             raise Exception(f"Failed to copy spreadsheet: {e}")
     
-    def create_project(self, project: Project) -> Dict[str, str]:
-        """Create a project in Google Drive with all required components.
+    def ensure_spreadsheet_from_template(self, template_id: str, new_title: str, folder_id: str) -> Dict[str, str]:
+        """Verifies a template exists and creates a spreadsheet from it.
+        
+        This method checks if the template exists, handles potential errors,
+        and creates a new spreadsheet from the template.
         
         Args:
-            project: Project object with at least the name
+            template_id: ID of the template spreadsheet
+            new_title: Title for the new spreadsheet
+            folder_id: ID of the folder where to place the copy
             
         Returns:
-            Dictionary with project details including IDs and URLs
+            Dictionary with spreadsheet ID and URL
+            
+        Raises:
+            Exception: If template doesn't exist or other errors occur
         """
-        if not self.is_initialized():
-            raise Exception("Google services are not initialized. Please check your credentials and scopes.")
-            
         try:
-            # Generate a unique ID for the project if not provided
-            if not project.id:
-                project.id = generate_uuid()
-            project_name = project.name
+            # First check if template exists and is accessible
+            template_info = self.get_file(template_id)
+            print(f"Template found: {template_info.get('name')} (ID: {template_info.get('id')})")
             
-            print(f"Creating project: {project_name}")
+            # Then create spreadsheet from template
+            return self.copy_spreadsheet_from_template(template_id, new_title, folder_id)
+        except Exception as error:
+            if isinstance(error, HttpError) and error.resp.status == 404:
+                raise Exception(f"Template with ID {template_id} not found. Please check the template ID.")
+            raise Exception(f"Failed to create spreadsheet from template: {error}")
+    
+    def get_file(self, file_id: str) -> Dict[str, Any]:
+        """Get file information from Google Drive.
+        
+        Args:
+            file_id: ID of the file to get
             
-            # 1. Create a folder for the project
-            parent_folder_id = settings.GOOGLE_PROJECTS_FOLDER_ID
+        Returns:
+            Dictionary with file information
+        """
+        try:
+            return self.drive_service.files().get(
+                fileId=file_id, 
+                fields="id,name,mimeType,parents"
+            ).execute()
+        except HttpError as error:
+            raise Exception(f"Failed to get file with ID {file_id}: {error}")
+    
+    def delete_file(self, file_id: str) -> None:
+        """Delete a file from Google Drive.
+        
+        Args:
+            file_id: ID of the file to delete
             
-            # Create folder in root or parent folder
-            if parent_folder_id:
-                # Verify that parent folder exists and is accessible
-                try:
-                    parent_folder = self.drive_service.files().get(fileId=parent_folder_id, fields="id,name").execute()
-                    print(f"Parent folder found: {parent_folder.get('name')} (ID: {parent_folder.get('id')})")
-                except HttpError as error:
-                    if error.resp.status == 404:
-                        raise Exception(f"Parent folder with ID {parent_folder_id} not found. Check GOOGLE_PROJECTS_FOLDER_ID setting and make sure you have access to this folder.")
-                    else:
-                        raise Exception(f"Error accessing parent folder: {str(error)}")
-                
-                folder_info = self.create_drive_folder(f"{project_name}", parent_folder_id)
-            else:
-                # If no parent folder ID is set, create in the root of Google Drive
-                folder_info = self.create_drive_folder(f"{project_name}")
-                
-            project_folder_id = folder_info["folder_id"]
-            print(f"Created project folder: {project_name} (ID: {project_folder_id})")
+        Returns:
+            None
+        """
+        try:
+            self.drive_service.files().delete(fileId=file_id).execute()
+        except HttpError as error:
+            raise Exception(f"Failed to delete file with ID {file_id}: {error}")
+    
+    def move_file(self, file_id: str, folder_id: str) -> None:
+        """Move a file to a different folder in Google Drive.
+        
+        Args:
+            file_id: ID of the file to move
+            folder_id: ID of the destination folder
             
-            # 2. Create project info spreadsheet from template
-            project_info_template_id = settings.GOOGLE_PROJECT_INFO_TEMPLATE_ID
-            if not project_info_template_id:
-                raise Exception("GOOGLE_PROJECT_INFO_TEMPLATE_ID is not configured in settings")
+        Returns:
+            None
+        """
+        try:
+            # First get the current parents
+            file = self.drive_service.files().get(
+                fileId=file_id, 
+                fields='parents'
+            ).execute()
             
-            # Verify that template exists and is accessible
-            try:
-                template_info = self.drive_service.files().get(fileId=project_info_template_id, fields="id,name").execute()
-                print(f"Project info template found: {template_info.get('name')} (ID: {template_info.get('id')})")
-            except HttpError as error:
-                if error.resp.status == 404:
-                    raise Exception(f"Project info template with ID {project_info_template_id} not found. Check GOOGLE_PROJECT_INFO_TEMPLATE_ID setting and make sure you have access to this file.")
-                else:
-                    raise Exception(f"Error accessing project info template: {str(error)}")
+            # Remove current parents and add new parent
+            previous_parents = ",".join(file.get('parents', []))
+            self.drive_service.files().update(
+                fileId=file_id,
+                addParents=folder_id,
+                removeParents=previous_parents,
+                fields='id, parents'
+            ).execute()
+        except HttpError as error:
+            raise Exception(f"Failed to move file with ID {file_id} to folder {folder_id}: {error}")
+    
+    def clear_range(self, spreadsheet_id: str, range_name: str) -> None:
+        """Clear a range in a Google Sheet.
+        
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            range_name: Range to clear (e.g. "Sheet1!A1:B10")
             
-            project_info = self.copy_spreadsheet_from_template(
-                project_info_template_id,
-                f"{project_name} - Project info",
-                project_folder_id
+        Returns:
+            None
+        """
+        try:
+            self.sheets_service.spreadsheets().values().clear(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                body={}
+            ).execute()
+        except HttpError as error:
+            print(f"Warning: Failed to clear range {range_name}: {error}")
+    
+    def update_range(self, spreadsheet_id: str, range_name: str, values: List[List[Any]], 
+                     value_input_option: str = "RAW") -> Dict[str, Any]:
+        """Update a range in a Google Sheet.
+        
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            range_name: Range to update (e.g. "Sheet1!A1:B10")
+            values: 2D array of values to update
+            value_input_option: How to interpret the values ("RAW" or "USER_ENTERED")
+            
+        Returns:
+            Response from the API
+        """
+        try:
+            return self.sheets_service.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                valueInputOption=value_input_option,
+                body={"values": values}
+            ).execute()
+        except HttpError as error:
+            raise Exception(f"Failed to update range {range_name}: {error}")
+    
+    def update_project_sheet(self, spreadsheet_id: str, sheet_name: str, data: List[List[Any]]) -> Dict[str, Any]:
+        """Update a project sheet with data.
+        
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            sheet_name: Name of the sheet to update
+            data: 2D array of data to update
+            
+        Returns:
+            Response from the API
+        """
+        try:
+            # Get the sheet
+            sheet = self.get_sheet_by_name(spreadsheet_id, sheet_name)
+            if not sheet:
+                raise Exception(f"Sheet '{sheet_name}' not found in spreadsheet with ID {spreadsheet_id}")
+            
+            sheet_title = sheet['properties']['title']
+            
+            # First clear the range to remove old data
+            self.clear_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=f"{sheet_title}!A1:B{len(data) + 5}"  # Add buffer for safety
             )
-            print(f"Created project info spreadsheet: {project_name} - Project info (ID: {project_info.get('spreadsheet_id')})")
             
-            # 3. Create report spreadsheet from template
-            report_template_id = settings.GOOGLE_PROJECT_REPORT_TEMPLATE_ID
-            if not report_template_id:
-                raise Exception("GOOGLE_PROJECT_REPORT_TEMPLATE_ID is not configured in settings")
-            
-            # Verify that template exists and is accessible
-            try:
-                template_info = self.drive_service.files().get(fileId=report_template_id, fields="id,name").execute()
-                print(f"Report template found: {template_info.get('name')} (ID: {template_info.get('id')})")
-            except HttpError as error:
-                if error.resp.status == 404:
-                    raise Exception(f"Report template with ID {report_template_id} not found. Check GOOGLE_PROJECT_REPORT_TEMPLATE_ID setting and make sure you have access to this file.")
-                else:
-                    raise Exception(f"Error accessing report template: {str(error)}")
-            
-            report = self.copy_spreadsheet_from_template(
-                report_template_id,
-                f"{project_name} - General Expenses",
-                project_folder_id
+            # Update the sheet with new data
+            response = self.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=f"{sheet_title}!A1:B{len(data)}",
+                values=data,
+                value_input_option="USER_ENTERED"
             )
-            print(f"Created report spreadsheet: {project_name} - General Expenses (ID: {report.get('spreadsheet_id')})")
             
-            # 4. Create calculations spreadsheet from template
-            calculations_template_id = settings.GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID
-            if not calculations_template_id:
-                raise Exception("GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID is not configured in settings")
+            return response
+        except Exception as error:
+            raise Exception(f"Failed to update project sheet: {error}")
+    
+    def format_project_sheet(self, spreadsheet_id: str, sheet_name: str, format_requests: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """Format a project sheet according to provided or default formatting.
+        
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            sheet_name: Name of the sheet to format
+            format_requests: Optional list of formatting requests (if None, default formatting will be applied)
             
-            # Verify that template exists and is accessible
-            try:
-                template_info = self.drive_service.files().get(fileId=calculations_template_id, fields="id,name").execute()
-                print(f"Calculations template found: {template_info.get('name')} (ID: {template_info.get('id')})")
-            except HttpError as error:
-                if error.resp.status == 404:
-                    raise Exception(f"Calculations template with ID {calculations_template_id} not found. Check GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID setting and make sure you have access to this file.")
-                else:
-                    raise Exception(f"Error accessing calculations template: {str(error)}")
+        Returns:
+            Response from the API
+        """
+        try:
+            # Get the sheet
+            sheet = self.get_sheet_by_name(spreadsheet_id, sheet_name)
+            if not sheet:
+                raise Exception(f"Sheet '{sheet_name}' not found in spreadsheet with ID {spreadsheet_id}")
             
-            calculations = self.copy_spreadsheet_from_template(
-                calculations_template_id,
-                f"{project_name} - Payment Distribution",
-                project_folder_id
+            sheet_id = sheet['properties']['sheetId']
+            
+            # If no format requests provided, use default formatting
+            if not format_requests:
+                format_requests = [
+                    # Title formatting
+                    {
+                        "repeatCell": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": 0,
+                                "endRowIndex": 1,
+                                "startColumnIndex": 0,
+                                "endColumnIndex": 8
+                            },
+                            "cell": {
+                                "userEnteredFormat": {
+                                    "textFormat": {
+                                        "fontSize": 14,
+                                        "bold": True
+                                    },
+                                    "backgroundColor": {
+                                        "red": 0.95,
+                                        "green": 0.95,
+                                        "blue": 0.95
+                                    }
+                                }
+                            },
+                            "fields": "userEnteredFormat(textFormat,backgroundColor)"
+                        }
+                    },
+                    # Headers and labels
+                    {
+                        "repeatCell": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": 1,
+                                "endRowIndex": 2,
+                                "startColumnIndex": 0,
+                                "endColumnIndex": 2
+                            },
+                            "cell": {
+                                "userEnteredFormat": {
+                                    "textFormat": {
+                                        "bold": True
+                                    },
+                                    "backgroundColor": {
+                                        "red": 0.95,
+                                        "green": 0.95,
+                                        "blue": 0.95
+                                    }
+                                }
+                            },
+                            "fields": "userEnteredFormat(textFormat,backgroundColor)"
+                        }
+                    },
+                    # Field labels formatting
+                    {
+                        "repeatCell": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": 2,
+                                "endRowIndex": 17,
+                                "startColumnIndex": 0,
+                                "endColumnIndex": 1
+                            },
+                            "cell": {
+                                "userEnteredFormat": {
+                                    "textFormat": {
+                                        "bold": True
+                                    }
+                                }
+                            },
+                            "fields": "userEnteredFormat(textFormat)"
+                        }
+                    }
+                ]
+            
+            # Apply formatting
+            response = self.batch_update(
+                spreadsheet_id=spreadsheet_id,
+                requests=format_requests
             )
-            print(f"Created calculations spreadsheet: {project_name} - Payment Distribution (ID: {calculations.get('spreadsheet_id')})")
             
-            # Update project with information about created resources
-            project.drive_folder_id = project_folder_id
-            project.project_info_spreadsheet_id = project_info["spreadsheet_id"]
-            project.report_spreadsheet_id = report["spreadsheet_id"]
-            project.calculations_spreadsheet_id = calculations["spreadsheet_id"]
-            project.modified = datetime.utcnow()
+            return response
+        except Exception as error:
+            raise Exception(f"Failed to format project sheet: {error}")
+    
+    def batch_update(self, spreadsheet_id: str, requests: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Perform batch update operations on a Google Sheet.
+        
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            requests: List of requests to execute
             
-            # Update main project information
-            print(f"Updating project info with links to related documents:")
-            print(f"  - Project name: {project_name}")
-            print(f"  - Project info URL: {project_info['spreadsheet_url']}")
-            print(f"  - Folder URL: https://drive.google.com/drive/folders/{project_folder_id}")
-            print(f"  - Calculations URL: {calculations['spreadsheet_url']}")
-            print(f"  - Report URL: {report['spreadsheet_url']}")
-            
-            update_project_info_sheet(self.sheets_service, project_info["spreadsheet_id"], project)
-            print(f"Project info updated successfully")
-            
-            # Return all information about the created project
-            return {
-                "project_id": project.id,
-                "drive_folder_id": project_folder_id,
-                "drive_folder_url": folder_info["folder_url"],
-                "project_info_spreadsheet_id": project_info["spreadsheet_id"],
-                "project_info_spreadsheet_url": project_info["spreadsheet_url"],
-                "report_spreadsheet_id": report["spreadsheet_id"],
-                "report_spreadsheet_url": report["spreadsheet_url"],
-                "calculations_spreadsheet_id": calculations["spreadsheet_id"],
-                "calculations_spreadsheet_url": calculations["spreadsheet_url"]
-            }
-        except Exception as e:
-            # Clean up any created resources on failure
-            try:
-                if 'project_folder_id' in locals():
-                    self.drive_service.files().delete(fileId=project_folder_id).execute()
-                    print(f"Cleaned up folder {project_folder_id} after error")
-            except Exception as cleanup_error:
-                print(f"Failed to clean up resources after error: {str(cleanup_error)}")
-            
-            raise Exception(f"Failed to create project: {str(e)}")
+        Returns:
+            Response from the API
+        """
+        try:
+            return self.sheets_service.spreadsheets().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body={"requests": requests}
+            ).execute()
+        except HttpError as error:
+            raise Exception(f"Failed to batch update spreadsheet: {error}")
 
     def is_initialized(self) -> bool:
         """Check if the service is properly initialized.

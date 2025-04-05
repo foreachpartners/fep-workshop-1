@@ -7,6 +7,7 @@ from datetime import datetime
 
 from feptm.models import Project, ProjectMetaResponse
 from feptm.services.google_sheets_service import google_sheets_service
+from feptm.timesheets.project_service import TimesheetProjectService
 from feptm.core.config import settings
 
 router = APIRouter()
@@ -91,8 +92,11 @@ async def create_project(request: ProjectCreateRequest):
         # Create minimal Project with just the name
         project = Project(name=request.project_name)
         
+        # Initialize timesheet project service with the Google Sheets service
+        timesheet_service = TimesheetProjectService(google_sheets_service)
+        
         # Create project in Google Drive
-        result = google_sheets_service.create_project(project)
+        result = timesheet_service.create_project(project)
         
         # Return the response
         return ProjectMetaResponse(
