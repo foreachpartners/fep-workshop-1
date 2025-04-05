@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, Query, Path
 from typing import List, Optional
 from pydantic import BaseModel
+from datetime import datetime
 
 from feptm.models import Project, ProjectMetaResponse
 from feptm.services.google_sheets_service import google_sheets_service
@@ -96,8 +97,8 @@ async def create_project(request: ProjectCreateRequest):
         # Return the response
         return ProjectMetaResponse(
             project_id=result["project_id"],
-            spreadsheet_id=result.get("spreadsheet_id", ""),
-            spreadsheet_url=result.get("spreadsheet_url", ""),
+            created=project.created,
+            modified=project.modified,
             drive_folder_id=result.get("drive_folder_id", ""),
             drive_folder_url=result.get("drive_folder_url", ""),
             project_info_spreadsheet_id=result.get("project_info_spreadsheet_id", ""),
