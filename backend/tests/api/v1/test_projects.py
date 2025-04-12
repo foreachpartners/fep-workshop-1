@@ -10,26 +10,6 @@ from fastapi.testclient import TestClient
 from feptm.models.project import Project, ProjectMetaResponse
 
 
-def test_get_projects_returns_empty_list(client):
-    """Test get_projects endpoint returns empty list (stub implementation)."""
-    # Call API
-    response = client.get("/api/projects/")
-    
-    # Assert response
-    assert response.status_code == 200
-    assert response.json() == []
-
-
-def test_get_project_returns_404(client):
-    """Test get_project endpoint returns 404 for non-existent project (stub implementation)."""
-    # Call API with non-existent project ID
-    response = client.get("/api/projects/non-existent-id")
-    
-    # Assert response
-    assert response.status_code == 404
-    assert "not found" in response.json()["detail"]
-
-
 @patch("feptm.api.v1.projects.TimesheetProjectService")
 @patch("feptm.api.v1.projects.settings")
 def test_create_project_success(mock_settings, mock_timesheet_service, client):

@@ -1,9 +1,7 @@
 """API endpoints for projects."""
 
-from fastapi import APIRouter, HTTPException, Query, Path
-from typing import List, Optional
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from datetime import datetime
 
 from feptm.models import Project, ProjectMetaResponse
 from feptm.services.google_sheets_service import google_sheets_service
@@ -11,38 +9,6 @@ from feptm.timesheets.project_service import TimesheetProjectService
 from feptm.core.config import settings
 
 router = APIRouter()
-
-
-@router.get("/", response_model=List[Project])
-async def get_projects():
-    """Get all projects.
-    
-    Returns:
-        List of projects
-    """
-    # Note: This is a stub that needs to be implemented with real data
-    # TODO: Implement actual project retrieval from database
-    return []
-
-
-@router.get("/{project_id}", response_model=Project)
-async def get_project(
-    project_id: str = Path(..., description="The ID of the project to get")
-):
-    """Get a project by ID.
-    
-    Args:
-        project_id: ID of the project
-    
-    Returns:
-        Project if found
-        
-    Raises:
-        HTTPException: If project not found
-    """
-    # Note: This is a stub that needs to be implemented with real data
-    # TODO: Implement actual project retrieval from database
-    raise HTTPException(status_code=404, detail=f"Project with ID {project_id} not found")
 
 
 class ProjectCreateRequest(BaseModel):
