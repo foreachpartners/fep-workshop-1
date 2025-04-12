@@ -1,4 +1,4 @@
-.PHONY: lint format isort typecheck all
+.PHONY: lint format isort typecheck test all
 
 lint:
 	uv run flake8
@@ -12,5 +12,8 @@ isort:
 typecheck:
 	uv run mypy
 
+test:
+	uv run pytest $(ARGS)
+
 # Запуск всех инструментов
-all: lint format isort typecheck 
+all: lint format isort typecheck test 
