@@ -2,6 +2,12 @@
 
 A backend service for automating time and materials accounting using Google Sheets API as a single source of truth.
 
+## TODO
+
+1. Add tests
+2. Linter
+
+
 ## Technology Stack
 - Python 3.12+
 - FastAPI 0.110.0+

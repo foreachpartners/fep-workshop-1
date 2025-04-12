@@ -1,47 +1,48 @@
-"""Business logic for project management in timesheets."""
+"""Service for working with Google Sheets and projects."""
 
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-from feptm.core.config import settings
-from feptm.models import Project
+from feptm.models.project import Project
 from feptm.services.google_sheets_service import GoogleSheetsService
+from feptm.core.config import settings
 
 
 class TimesheetProjectService:
-    """Service for managing projects in timesheets."""
-
+    """Service for handling project timesheets."""
+    
     def __init__(self, google_sheets_service: GoogleSheetsService):
-        """Initialize the service with Google Sheets service.
-        
-        Args:
-            google_sheets_service: Google Sheets service instance
-        """
+        """Initialize with Google Sheets service."""
         self.google_sheets_service = google_sheets_service
     
     def update_project_info_sheet(self, spreadsheet_id: str, project: Project) -> None:
-        """Update project info sheet with metadata.
+        """Update the project info sheet with project details.
         
         Args:
             spreadsheet_id: ID of the spreadsheet
-            project: Project object
+            project: Project object with at least the name
             
         Returns:
             None
         """
         try:
-            # Prepare project data structure
-            project_data = [
-                ["Name", "Value"],  # Headers
-                ["ProjectName", project.name or ""]
-            ]
+            # Prepare basic project data
+            project_data = []
             
-            # Add link to the project info document
-            spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
-            project_data.append(["Project Info", f'=HYPERLINK("{spreadsheet_url}"; "{spreadsheet_url}")'])
+            # Title row
+            project_data.append(["Project Information", ""])
             
-            # Add link to project folder if available
-            folder_url = project.drive_folder_url
+            # Headers
+            project_data.append(["Field", "Value"])
+            
+            # Project metadata
+            project_data.append(["Project ID", project.id])
+            project_data.append(["Name", project.name])
+            project_data.append(["Created", datetime.strftime(project.created, "%Y-%m-%d %H:%M:%S UTC")])
+            project_data.append(["Modified", datetime.strftime(project.modified, "%Y-%m-%d %H:%M:%S UTC")])
+            
+            # Add hyperlink to Google Drive folder if available
+            folder_url = f"https://drive.google.com/drive/folders/{project.drive_folder_id}" if project.drive_folder_id else ""
             project_data.append(["Project Folder", f'=HYPERLINK("{folder_url}"; "{folder_url}")'])
             
             # Add links to created documents
@@ -59,26 +60,6 @@ class TimesheetProjectService:
         except Exception as error:
             raise Exception(f"Failed to update project info sheet: {error}")
 
-    def format_project_info_sheet(self, spreadsheet_id: str) -> None:
-        """Format the project info sheet.
-        
-        Args:
-            spreadsheet_id: ID of the spreadsheet
-            
-        Returns:
-            None
-        """
-        try:
-            # Let the service handle sheet formatting with default settings
-            self.google_sheets_service.format_project_sheet(
-                spreadsheet_id=spreadsheet_id,
-                sheet_name="Project info"
-            )
-            
-            return None
-        except Exception as error:
-            raise Exception(f"Failed to format project info sheet: {error}")
-    
     def _create_spreadsheet_from_template(self, template_id: str, new_title: str, folder_id: str) -> Dict[str, str]:
         """Helper method to create a spreadsheet from a template.
         
@@ -203,54 +184,4 @@ class TimesheetProjectService:
             except Exception as cleanup_error:
                 print(f"Failed to clean up resources after error: {str(cleanup_error)}")
             
-            raise Exception(f"Failed to create project: {str(e)}")
-
-    def create_project_metadata(self, project: Project) -> Dict[str, str]:
-        """Create Google Sheets with project metadata and setup.
-        
-        Args:
-            project: Project object with at least the name
-            
-        Returns:
-            Dictionary with spreadsheet ID and URL
-        """
-        # Create a new spreadsheet for the project
-        spreadsheet_info = self.google_sheets_service.create_spreadsheet(project.name)
-        
-        # ID of the new spreadsheet
-        spreadsheet_id = spreadsheet_info["spreadsheet_id"]
-        
-        # Get spreadsheet URL
-        spreadsheet_url = spreadsheet_info["spreadsheet_url"]
-        
-        # Update project information
-        self.update_project_info_sheet(spreadsheet_id, project)
-        
-        # Format the spreadsheet for better display
-        self.format_project_info_sheet(spreadsheet_id)
-        
-        # If project has a folder ID, move the spreadsheet to this folder
-        drive_folder_url = None
-        if project.drive_folder_id:
-            try:
-                # Move spreadsheet to specified folder
-                self.google_sheets_service.move_file(
-                    file_id=spreadsheet_id,
-                    folder_id=project.drive_folder_id
-                )
-                
-                # Create folder URL
-                drive_folder_url = f"https://drive.google.com/drive/folders/{project.drive_folder_id}"
-            except Exception as error:
-                print(f"Failed to move spreadsheet to folder: {error}")
-        
-        # Generate a unique ID for the project if it doesn't have one
-        project_id = project.id
-        
-        return {
-            "project_id": project_id,
-            "spreadsheet_id": spreadsheet_info["spreadsheet_id"],
-            "spreadsheet_url": spreadsheet_info["spreadsheet_url"],
-            "drive_folder_id": project.drive_folder_id,
-            "drive_folder_url": drive_folder_url
-        } 
+            raise Exception(f"Failed to create project: {str(e)}") 
