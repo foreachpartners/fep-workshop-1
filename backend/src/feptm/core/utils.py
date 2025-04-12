@@ -1,20 +1,11 @@
 """Utility functions for the application."""
 
-import logging
 import uuid
 from datetime import datetime
 from typing import Any, Dict
 
 from feptm.core.config import settings
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO if not settings.DEBUG else logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-
-logger = logging.getLogger(__name__)
+from feptm.core.log import log
 
 
 def generate_uuid() -> str:

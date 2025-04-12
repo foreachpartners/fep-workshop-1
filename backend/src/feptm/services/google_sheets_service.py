@@ -12,6 +12,7 @@ from googleapiclient.discovery import Resource, build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
 
 from feptm.core.config import settings
+from feptm.core.log import log
 
 
 class GoogleSheetsService:
@@ -64,18 +65,18 @@ class GoogleSheetsService:
             # Set up OAuth 2.0 credentials
             creds = self._get_credentials()
             if not creds:
-                print("Failed to obtain OAuth credentials")
+                log.error("Failed to obtain OAuth credentials")
                 return False
 
             # Build the services
             self.drive_service = build("drive", "v3", credentials=creds)
             self.sheets_service = build("sheets", "v4", credentials=creds)
 
-            print("Google Drive and Sheets services initialized successfully")
+            log.info("Google Drive and Sheets services initialized successfully")
             return True
 
         except Exception as e:
-            print(f"Error initializing Google services: {str(e)}")
+            log.error(f"Error initializing Google services: {str(e)}")
             self.drive_service = None
             self.sheets_service = None
             return False
@@ -100,7 +101,7 @@ class GoogleSheetsService:
                     json.loads(token_path.read_text()), scopes
                 )
             except Exception as e:
-                print(f"Error loading token file: {str(e)}")
+                log.error(f"Error loading token file: {str(e)}")
 
         # If there are no valid credentials, let the user log in
         if not creds or not creds.valid:
@@ -128,7 +129,7 @@ class GoogleSheetsService:
                     }
                 )
             )
-            print(f"Saved credentials to {self.token_file}")
+            log.info(f"Saved credentials to {self.token_file}")
 
         return cast(Optional[UserCredentials], creds)
 
@@ -192,7 +193,7 @@ class GoogleSheetsService:
             # Get list of sheets
             sheets = spreadsheet_metadata.get("sheets", [])
             if not sheets:
-                print(
+                log.warning(
                     f"Warning: No sheets found in the spreadsheet with ID {spreadsheet_id}"
                 )
                 return None
@@ -208,7 +209,7 @@ class GoogleSheetsService:
                     break
 
             if not target_sheet:
-                print(
+                log.warning(
                     f"Warning: Sheet '{sheet_name}' not found. Available sheets: {', '.join(available_sheets)}"
                 )
                 return None
@@ -216,7 +217,7 @@ class GoogleSheetsService:
             return cast(Dict[str, Any], target_sheet)
 
         except Exception as error:
-            print(f"Error getting sheet by name: {error}")
+            log.error(f"Error getting sheet by name: {error}")
             return None
 
     def create_drive_folder(
@@ -331,7 +332,7 @@ class GoogleSheetsService:
         try:
             # First check if template exists and is accessible
             template_info = self.get_file(template_id)
-            print(
+            log.info(
                 f"Template found: {template_info.get('name')} (ID: {template_info.get('id')})"
             )
 
@@ -423,11 +424,11 @@ class GoogleSheetsService:
             )
 
     def clear_range(self, spreadsheet_id: str, range_name: str) -> None:
-        """Clear a range in a Google Sheet.
+        """Clear values in a range.
 
         Args:
             spreadsheet_id: ID of the spreadsheet
-            range_name: Range to clear (e.g. "Sheet1!A1:B10")
+            range_name: Range to clear (A1 notation)
 
         Returns:
             None
@@ -439,8 +440,9 @@ class GoogleSheetsService:
             self.sheets_service.spreadsheets().values().clear(
                 spreadsheetId=spreadsheet_id, range=range_name, body={}
             ).execute()
-        except HttpError as error:
-            print(f"Warning: Failed to clear range {range_name}: {error}")
+        except Exception as error:
+            log.warning(f"Warning: Failed to clear range {range_name}: {error}")
+            # We don't raise an exception here since clearing might be optional
 
     def update_range(
         self,

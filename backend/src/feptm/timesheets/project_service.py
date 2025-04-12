@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from feptm.core.config import settings
+from feptm.core.log import log
 from feptm.models.project import Project
 from feptm.services.google_sheets_service import GoogleSheetsService
 
@@ -107,7 +108,9 @@ class TimesheetProjectService:
             template_id=template_id, new_title=new_title, folder_id=folder_id
         )
 
-        print(f"Created spreadsheet: {new_title} (ID: {result.get('spreadsheet_id')})")
+        log.info(
+            f"Created spreadsheet: {new_title} (ID: {result.get('spreadsheet_id')})"
+        )
         return result
 
     def create_project(self, project: Project) -> Dict[str, str]:
@@ -127,7 +130,7 @@ class TimesheetProjectService:
         try:
             project_name = project.name
 
-            print(f"Creating project: {project_name}")
+            log.info(f"Creating project: {project_name}")
 
             # 1. Create a folder for the project
             parent_folder_id = settings.GOOGLE_PROJECTS_FOLDER_ID
@@ -139,7 +142,7 @@ class TimesheetProjectService:
                     parent_folder = self.google_sheets_service.get_file(
                         parent_folder_id
                     )
-                    print(
+                    log.info(
                         f"Parent folder found: {parent_folder.get('name')} (ID: {parent_folder.get('id')})"
                     )
                 except Exception as error:
@@ -157,7 +160,9 @@ class TimesheetProjectService:
                 )
 
             project_folder_id = folder_info["folder_id"]
-            print(f"Created project folder: {project_name} (ID: {project_folder_id})")
+            log.info(
+                f"Created project folder: {project_name} (ID: {project_folder_id})"
+            )
 
             # 2. Create project info spreadsheet from template
             project_info = self._create_spreadsheet_from_template(
@@ -188,17 +193,17 @@ class TimesheetProjectService:
             project.modified = datetime.utcnow()
 
             # Update main project information
-            print(f"Updating project info with links to related documents:")
-            print(f"  - Project name: {project_name}")
-            print(f"  - Project info URL: {project_info['spreadsheet_url']}")
-            print(
+            log.info(f"Updating project info with links to related documents:")
+            log.info(f"  - Project name: {project_name}")
+            log.info(f"  - Project info URL: {project_info['spreadsheet_url']}")
+            log.info(
                 f"  - Folder URL: https://drive.google.com/drive/folders/{project_folder_id}"
             )
-            print(f"  - Calculations URL: {calculations['spreadsheet_url']}")
-            print(f"  - Report URL: {report['spreadsheet_url']}")
+            log.info(f"  - Calculations URL: {calculations['spreadsheet_url']}")
+            log.info(f"  - Report URL: {report['spreadsheet_url']}")
 
             self.update_project_info_sheet(project_info["spreadsheet_id"], project)
-            print(f"Project info updated successfully")
+            log.info(f"Project info updated successfully")
 
             # Return all information about the created project
             return {
@@ -217,8 +222,10 @@ class TimesheetProjectService:
             try:
                 if "project_folder_id" in locals():
                     self.google_sheets_service.delete_file(project_folder_id)
-                    print(f"Cleaned up folder {project_folder_id} after error")
+                    log.warning(f"Cleaned up folder {project_folder_id} after error")
             except Exception as cleanup_error:
-                print(f"Failed to clean up resources after error: {str(cleanup_error)}")
+                log.error(
+                    f"Failed to clean up resources after error: {str(cleanup_error)}"
+                )
 
             raise Exception(f"Failed to create project: {str(e)}")

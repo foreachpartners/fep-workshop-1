@@ -14,14 +14,9 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger("google_sheets_explorer")
-
+# Import our configured logger
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from src.feptm.core.log import log
 
 # Define default credentials locations to check
 DEFAULT_CREDENTIALS_LOCATIONS = [
@@ -47,14 +42,13 @@ class GoogleSheetsExplorer:
                               If None, will search in default locations.
             token_file: Path to the token file for storing OAuth tokens
         """
-        self.logger = logging.getLogger(__name__)
         self.credentials_file = self._find_credentials_file(credentials_file)
         self.token_file = token_file or DEFAULT_TOKEN_FILE
         self.drive_service = None
         self.sheets_service = None
         
-        self.logger.info(f"GoogleSheetsExplorer initialized with credentials file: {self.credentials_file}")
-        self.logger.info(f"Token file: {self.token_file}")
+        log.info(f"GoogleSheetsExplorer initialized with credentials file: {self.credentials_file}")
+        log.info(f"Token file: {self.token_file}")
         
     def _find_credentials_file(self, credentials_file: Optional[str] = None) -> str:
         """
@@ -74,13 +68,13 @@ class GoogleSheetsExplorer:
             if os.path.isfile(credentials_file):
                 return credentials_file
             else:
-                self.logger.warning(f"Provided credentials file not found: {credentials_file}")
-                self.logger.info("Searching in default locations...")
+                log.warning(f"Provided credentials file not found: {credentials_file}")
+                log.info("Searching in default locations...")
         
         # Check default locations
         for location in DEFAULT_CREDENTIALS_LOCATIONS:
             if os.path.isfile(location):
-                self.logger.info(f"Found credentials file at: {location}")
+                log.info(f"Found credentials file at: {location}")
                 return location
         
         # If we get here, no credentials file was found
@@ -97,18 +91,18 @@ class GoogleSheetsExplorer:
             # Set up OAuth 2.0 credentials
             credentials = self._get_credentials()
             if not credentials:
-                self.logger.error("Failed to obtain OAuth credentials")
+                log.error("Failed to obtain OAuth credentials")
                 return False
                 
             # Build the services
             self.drive_service = build('drive', 'v3', credentials=credentials)
             self.sheets_service = build('sheets', 'v4', credentials=credentials)
             
-            self.logger.info("Google Drive and Sheets services initialized successfully")
+            log.info("Google Drive and Sheets services initialized successfully")
             return True
             
         except Exception as e:
-            self.logger.error(f"Error initializing Google services: {str(e)}")
+            log.error(f"Error initializing Google services: {str(e)}")
             return False
     
     def _get_credentials(self) -> Optional[UserCredentials]:
@@ -133,7 +127,7 @@ class GoogleSheetsExplorer:
                     scopes
                 )
             except Exception as e:
-                self.logger.warning(f"Error loading token file: {str(e)}")
+                log.warning(f"Error loading token file: {str(e)}")
         
         # If there are no valid credentials, let the user log in
         if not creds or not creds.valid:
@@ -157,7 +151,7 @@ class GoogleSheetsExplorer:
                     'client_secret': creds.client_secret,
                     'scopes': creds.scopes
                 }))
-                self.logger.info(f"Saved credentials to {self.token_file}")
+                log.info(f"Saved credentials to {self.token_file}")
         
         return creds
     
@@ -173,7 +167,7 @@ class GoogleSheetsExplorer:
         """
         if not self.drive_service:
             if not self.initialize():
-                self.logger.error("Failed to initialize Google services")
+                log.error("Failed to initialize Google services")
                 return []
                 
         try:
@@ -190,11 +184,11 @@ class GoogleSheetsExplorer:
             
             files = results.get('files', [])
             
-            self.logger.info(f"Found {len(files)} Google Sheets files in folder {folder_id}")
+            log.info(f"Found {len(files)} Google Sheets files in folder {folder_id}")
             return files
             
         except Exception as e:
-            self.logger.error(f"Error listing files: {str(e)}")
+            log.error(f"Error listing files: {str(e)}")
             return []
     
     def create_test_spreadsheet(self, folder_id: str, name: Optional[str] = None) -> Optional[str]:
@@ -210,7 +204,7 @@ class GoogleSheetsExplorer:
         """
         if not self.drive_service or not self.sheets_service:
             if not self.initialize():
-                self.logger.error("Failed to initialize Google services")
+                log.error("Failed to initialize Google services")
                 return None
                 
         try:
@@ -290,7 +284,7 @@ class GoogleSheetsExplorer:
                     break
                     
             if sheet_id is None:
-                self.logger.warning("Could not find 'Sample Data' sheet ID. Formatting will be skipped.")
+                log.warning("Could not find 'Sample Data' sheet ID. Formatting will be skipped.")
             else:
                 # Format the header row in bold
                 format_request = {
@@ -336,13 +330,13 @@ class GoogleSheetsExplorer:
             # Get the link to the spreadsheet
             spreadsheet_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
             
-            self.logger.info(f"Created test spreadsheet '{spreadsheet_name}' with ID: {spreadsheet_id}")
-            self.logger.info(f"Spreadsheet URL: {spreadsheet_url}")
+            log.info(f"Created test spreadsheet '{spreadsheet_name}' with ID: {spreadsheet_id}")
+            log.info(f"Spreadsheet URL: {spreadsheet_url}")
             
             return spreadsheet_id
             
         except Exception as e:
-            self.logger.error(f"Error creating test spreadsheet: {str(e)}")
+            log.error(f"Error creating test spreadsheet: {str(e)}")
             return None
     
     def get_folder_details(self, folder_id: str) -> Dict[str, Any]:
@@ -357,7 +351,7 @@ class GoogleSheetsExplorer:
         """
         if not self.drive_service:
             if not self.initialize():
-                self.logger.error("Failed to initialize Google services")
+                log.error("Failed to initialize Google services")
                 return {}
                 
         try:
@@ -370,13 +364,15 @@ class GoogleSheetsExplorer:
             return folder
             
         except Exception as e:
-            self.logger.error(f"Error getting folder details: {str(e)}")
+            log.error(f"Error getting folder details: {str(e)}")
             return {}
 
 
 def main():
-    """Main entry point for the Google Sheets Explorer script"""
-    parser = argparse.ArgumentParser(description="Google Sheets Explorer")
+    """Main entry point for the tool"""
+    parser = argparse.ArgumentParser(
+        description='Google Sheets Explorer - List and manipulate Google Sheets files'
+    )
     parser.add_argument(
         "--credentials",
         required=False,
@@ -405,53 +401,53 @@ def main():
     args = parser.parse_args()
     
     try:
-        # Initialize the explorer
-        explorer = GoogleSheetsExplorer(
-            credentials_file=args.credentials,
-            token_file=args.token
-        )
+        explorer = GoogleSheetsExplorer(args.credentials, args.token)
         
         if not explorer.initialize():
-            logger.error("Failed to initialize Google Sheets Explorer")
-            sys.exit(1)
+            log.error("Failed to initialize Google Sheets Explorer")
+            return 1
         
-        # Get folder details
-        folder_details = explorer.get_folder_details(args.folder)
-        if folder_details:
-            logger.info(f"Folder: {folder_details.get('name')} (ID: {folder_details.get('id')})")
-        else:
-            logger.error(f"Failed to get details for folder ID: {args.folder}")
-            sys.exit(1)
-        
-        # List files in the folder
-        files = explorer.list_files(args.folder)
-        if files:
-            logger.info("\nGoogle Sheets files in folder:")
-            for i, file in enumerate(files, 1):
-                modified_time = file.get('modifiedTime', 'Unknown')
-                created_time = file.get('createdTime', 'Unknown')
-                logger.info(f"{i}. {file.get('name')} (ID: {file.get('id')})")
-                logger.info(f"   Created: {created_time}, Modified: {modified_time}")
-        else:
-            logger.info("No Google Sheets files found in the folder")
-        
-        # Create test spreadsheet if requested
-        if args.create_test:
-            spreadsheet_id = explorer.create_test_spreadsheet(args.folder, args.name)
-            if spreadsheet_id:
-                logger.info(f"\nTest spreadsheet created with ID: {spreadsheet_id}")
-                logger.info(f"URL: https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
+        if args.folder:
+            folder_details = explorer.get_folder_details(args.folder)
+            if folder_details:
+                log.info(f"Folder: {folder_details.get('name')} (ID: {folder_details.get('id')})")
             else:
-                logger.error("Failed to create test spreadsheet")
-                sys.exit(1)
+                log.error(f"Failed to get details for folder ID: {args.folder}")
+                return 1
                 
-    except FileNotFoundError as e:
-        logger.error(str(e))
-        sys.exit(1)
+            # List files in folder
+            files = explorer.list_files(args.folder)
+            if files:
+                log.info("\nGoogle Sheets files in folder:")
+                for i, file in enumerate(files, 1):
+                    created_time = datetime.datetime.fromisoformat(file.get('createdTime').replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M:%S')
+                    modified_time = datetime.datetime.fromisoformat(file.get('modifiedTime').replace('Z', '+00:00')).strftime('%Y-%m-%d %H:%M:%S')
+                    log.info(f"{i}. {file.get('name')} (ID: {file.get('id')})")
+                    log.info(f"   Created: {created_time}, Modified: {modified_time}")
+            else:
+                log.info("No Google Sheets files found in the folder")
+                
+            # Create test spreadsheet if requested
+            if args.create_test:
+                spreadsheet_id = explorer.create_test_spreadsheet(args.folder, args.name)
+                if spreadsheet_id:
+                    log.info(f"\nTest spreadsheet created with ID: {spreadsheet_id}")
+                    log.info(f"URL: https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
+                else:
+                    log.error("Failed to create test spreadsheet")
+                    return 1
+                    
+        return 0
+    except KeyboardInterrupt:
+        return 130
     except Exception as e:
-        logger.error(f"An error occurred: {str(e)}")
-        sys.exit(1)
+        log.error(str(e))
+        return 1
 
 
-if __name__ == "__main__":
-    main() 
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except Exception as e:
+        log.error(f"An error occurred: {str(e)}")
+        sys.exit(1) 
