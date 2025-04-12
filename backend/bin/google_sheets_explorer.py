@@ -26,8 +26,8 @@ DEFAULT_CREDENTIALS_LOCATIONS = [
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "credentials.json"),
 ]
 
-# Define default token locations
-DEFAULT_TOKEN_FILE = os.path.expanduser("~/.google_sheets_token.json")
+# Define default token locations - using multiple approaches for reliability
+DEFAULT_TOKEN_FILE = os.path.join(os.environ.get('HOME', os.path.expanduser('~')), ".google_sheets_token.json")
 
 
 class GoogleSheetsExplorer:
@@ -43,7 +43,13 @@ class GoogleSheetsExplorer:
             token_file: Path to the token file for storing OAuth tokens
         """
         self.credentials_file = self._find_credentials_file(credentials_file)
-        self.token_file = token_file or DEFAULT_TOKEN_FILE
+        
+        # Handle token file path with tilde expansion
+        if token_file and "~" in token_file:
+            self.token_file = os.path.expanduser(token_file)
+        else:
+            self.token_file = token_file or DEFAULT_TOKEN_FILE
+            
         self.drive_service = None
         self.sheets_service = None
         
@@ -119,11 +125,16 @@ class GoogleSheetsExplorer:
             'https://www.googleapis.com/auth/spreadsheets'
         ]
         
+        # Ensure token path is properly expanded
+        token_path = Path(self.token_file)
+        if isinstance(self.token_file, str) and "~" in self.token_file:
+            token_path = Path(os.path.expanduser(self.token_file))
+        
         # Check if token file exists and load credentials from it
-        if self.token_file and Path(self.token_file).exists():
+        if token_path.exists():
             try:
                 creds = UserCredentials.from_authorized_user_info(
-                    json.loads(Path(self.token_file).read_text()),
+                    json.loads(token_path.read_text()),
                     scopes
                 )
             except Exception as e:
@@ -140,18 +151,16 @@ class GoogleSheetsExplorer:
                 creds = flow.run_local_server(port=0)
             
             # Save the credentials for the next run
-            if self.token_file:
-                token_path = Path(self.token_file)
-                token_path.parent.mkdir(parents=True, exist_ok=True)
-                token_path.write_text(json.dumps({
-                    'token': creds.token,
-                    'refresh_token': creds.refresh_token,
-                    'token_uri': creds.token_uri,
-                    'client_id': creds.client_id,
-                    'client_secret': creds.client_secret,
-                    'scopes': creds.scopes
-                }))
-                log.info(f"Saved credentials to {self.token_file}")
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            token_path.write_text(json.dumps({
+                'token': creds.token,
+                'refresh_token': creds.refresh_token,
+                'token_uri': creds.token_uri,
+                'client_id': creds.client_id,
+                'client_secret': creds.client_secret,
+                'scopes': creds.scopes
+            }))
+            log.info(f"Saved credentials to {token_path}")
         
         return creds
     
@@ -400,6 +409,14 @@ def main():
     
     args = parser.parse_args()
     
+    # Expand token path if it contains tilde
+    if args.token and "~" in args.token:
+        args.token = os.path.expanduser(args.token)
+        
+    # Expand credentials path if it contains tilde
+    if args.credentials and "~" in args.credentials:
+        args.credentials = os.path.expanduser(args.credentials)
+        
     try:
         explorer = GoogleSheetsExplorer(args.credentials, args.token)
         

@@ -2,6 +2,7 @@
 /backend/.venv
 /backend/credentials.json
 .google_sheets_token.json
+/backend/.google_sheets_token.json
 
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python

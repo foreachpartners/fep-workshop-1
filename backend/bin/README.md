@@ -52,7 +52,7 @@ When you run the script for the first time, it will:
 1. Find the credentials file in one of the standard locations
 2. Open a browser window for you to log in to your Google account
 3. Ask for permission to access your Google Drive and Sheets
-4. Store the authentication token in the specified token file (defaults to `~/.google_sheets_token.json`)
+4. Store the authentication token in the specified token file (defaults to `~/.google_sheets_token.json` in your home directory)
 
 ## Example Output
 

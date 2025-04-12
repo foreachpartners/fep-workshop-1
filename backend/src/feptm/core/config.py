@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from pydantic import Field
+from pydantic import Field, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
         ).exists()
         else None
     )
-    GOOGLE_TOKEN_FILE: Optional[Path] = Path.home() / ".google_sheets_token.json"
+    GOOGLE_TOKEN_FILE: Optional[Path] = Path(os.environ.get('HOME', os.path.expanduser('~'))) / ".google_sheets_token.json"
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_TIMESHEET_TEMPLATE_ID: Optional[str] = None
@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     SPECIALIST_ROLES: list[str] = Field(
         default=["Developer", "QA", "Designer", "Project Manager", "DevOps"]
     )
+
+    @validator("GOOGLE_TOKEN_FILE", pre=True)
+    def expand_user_path(cls, v):
+        """Expand user home directory in path string if needed."""
+        if isinstance(v, str) and v.startswith("~"):
+            return os.path.expanduser(v)
+        return v
 
     model_config = SettingsConfigDict(
         env_file=".env",
