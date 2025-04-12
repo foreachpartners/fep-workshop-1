@@ -1,1 +1,1 @@
-"""API endpoints for the application.""" 
+"""API endpoints for the application."""

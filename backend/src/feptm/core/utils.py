@@ -53,4 +53,4 @@ def format_date_range(start_date: datetime, end_date: datetime) -> str:
     elif start_date.year == end_date.year:
         return f"{start_date.strftime('%b')} - {end_date.strftime('%b %Y')}"
     else:
-        return f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}" 
+        return f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"

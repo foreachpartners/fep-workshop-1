@@ -13,7 +13,9 @@ class Settings(BaseSettings):
 
     # Project info
     PROJECT_NAME: str = "Time & Materials Accounting API"
-    PROJECT_DESCRIPTION: str = "Backend service for time and materials accounting with Google Sheets"
+    PROJECT_DESCRIPTION: str = (
+        "Backend service for time and materials accounting with Google Sheets"
+    )
     VERSION: str = "0.1.0"
 
     # Base directory
@@ -26,22 +28,30 @@ class Settings(BaseSettings):
     API_KEY: Optional[str] = None
 
     # Google API settings
-    GOOGLE_CREDENTIALS_FILE: Optional[Path] = Path(__file__).resolve().parent.parent.parent.parent / "credentials.json" if (Path(__file__).resolve().parent.parent.parent.parent / "credentials.json").exists() else None
+    GOOGLE_CREDENTIALS_FILE: Optional[Path] = (
+        Path(__file__).resolve().parent.parent.parent.parent / "credentials.json"
+        if (
+            Path(__file__).resolve().parent.parent.parent.parent / "credentials.json"
+        ).exists()
+        else None
+    )
     GOOGLE_TOKEN_FILE: Optional[Path] = Path.home() / ".google_sheets_token.json"
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_TIMESHEET_TEMPLATE_ID: Optional[str] = None
     GOOGLE_REPORT_TEMPLATE_ID: Optional[str] = None
-    
+
     # Google Drive settings for projects
     # Important: make sure all these files are accessible to the user
     # authenticated via OAuth (enable "Share by link" access)
-    GOOGLE_PROJECTS_FOLDER_ID: Optional[str] = None # Specify the Google Drive folder ID here
-    
+    GOOGLE_PROJECTS_FOLDER_ID: Optional[str] = (
+        None  # Specify the Google Drive folder ID here
+    )
+
     # Google Sheets templates - specify your identifiers here or update environment variables
     # To make templates accessible, "Share by link" must be enabled for them (Share > General Access)
-    GOOGLE_PROJECT_INFO_TEMPLATE_ID: Optional[str] = None 
-    GOOGLE_PROJECT_REPORT_TEMPLATE_ID: Optional[str] = None 
+    GOOGLE_PROJECT_INFO_TEMPLATE_ID: Optional[str] = None
+    GOOGLE_PROJECT_REPORT_TEMPLATE_ID: Optional[str] = None
     GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID: Optional[str] = None
 
     # Model configurations
@@ -58,4 +68,4 @@ class Settings(BaseSettings):
 
 
 # Load settings
-settings = Settings() 
+settings = Settings()

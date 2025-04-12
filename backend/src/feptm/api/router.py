@@ -8,6 +8,4 @@ from feptm.api.v1 import projects
 router = APIRouter()
 
 # Include router for projects
-router.include_router(
-    projects.router, prefix="/projects", tags=["projects"]
-) 
+router.include_router(projects.router, prefix="/projects", tags=["projects"])

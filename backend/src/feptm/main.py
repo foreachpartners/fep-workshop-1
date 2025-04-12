@@ -17,4 +17,4 @@ app.include_router(api_router, prefix="/api")
 @app.get("/")
 async def root():
     """Health check endpoint."""
-    return {"status": "ok", "message": "Time & Materials accounting service is running"} 
+    return {"status": "ok", "message": "Time & Materials accounting service is running"}

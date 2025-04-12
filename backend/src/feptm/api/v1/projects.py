@@ -3,35 +3,36 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from feptm.core.config import settings
 from feptm.models import Project, ProjectMetaResponse
 from feptm.services.google_sheets_service import google_sheets_service
 from feptm.timesheets.project_service import TimesheetProjectService
-from feptm.core.config import settings
 
 router = APIRouter()
 
 
 class ProjectCreateRequest(BaseModel):
     """Request model for creating a project."""
+
     project_name: str
 
 
 @router.post("/create", response_model=ProjectMetaResponse)
 async def create_project(request: ProjectCreateRequest):
     """Create a new project in Google Drive.
-    
+
     This endpoint creates:
     1. A folder in Google Drive with the project name
     2. A Google Sheet with project info based on the template
     3. A report file linked to the project info
     4. A calculations sheet for the project
-    
+
     Args:
         request: Project creation request containing project name
-        
+
     Returns:
         Project creation response with IDs and URLs
-        
+
     Raises:
         HTTPException: If creation fails
     """
@@ -39,31 +40,31 @@ async def create_project(request: ProjectCreateRequest):
         # Validate configuration
         if not settings.GOOGLE_PROJECT_INFO_TEMPLATE_ID:
             raise HTTPException(
-                status_code=500, 
-                detail="GOOGLE_PROJECT_INFO_TEMPLATE_ID not configured. Please set this value in the environment variables."
+                status_code=500,
+                detail="GOOGLE_PROJECT_INFO_TEMPLATE_ID not configured. Please set this value in the environment variables.",
             )
-            
+
         if not settings.GOOGLE_PROJECT_REPORT_TEMPLATE_ID:
             raise HTTPException(
-                status_code=500, 
-                detail="GOOGLE_PROJECT_REPORT_TEMPLATE_ID not configured. Please set this value in the environment variables."
+                status_code=500,
+                detail="GOOGLE_PROJECT_REPORT_TEMPLATE_ID not configured. Please set this value in the environment variables.",
             )
-            
+
         if not settings.GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID:
             raise HTTPException(
-                status_code=500, 
-                detail="GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID not configured. Please set this value in the environment variables."
+                status_code=500,
+                detail="GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID not configured. Please set this value in the environment variables.",
             )
-        
+
         # Create minimal Project with just the name
         project = Project(name=request.project_name)
-        
+
         # Initialize timesheet project service with the Google Sheets service
         timesheet_service = TimesheetProjectService(google_sheets_service)
-        
+
         # Create project in Google Drive
         result = timesheet_service.create_project(project)
-        
+
         # Return the response
         return ProjectMetaResponse(
             project_id=result["project_id"],
@@ -76,10 +77,12 @@ async def create_project(request: ProjectCreateRequest):
             report_spreadsheet_id=result.get("report_spreadsheet_id", ""),
             report_spreadsheet_url=result.get("report_spreadsheet_url", ""),
             calculations_spreadsheet_id=result.get("calculations_spreadsheet_id", ""),
-            calculations_spreadsheet_url=result.get("calculations_spreadsheet_url", "")
+            calculations_spreadsheet_url=result.get("calculations_spreadsheet_url", ""),
         )
     except HTTPException as e:
         # Re-raise HTTP exceptions
         raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}") 
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create project: {str(e)}"
+        )
