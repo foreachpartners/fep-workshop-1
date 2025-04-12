@@ -5,13 +5,10 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, computed_field
 
-from feptm.core.utils import generate_uuid
-
 
 class Project(BaseModel):
     """Project model representing a client project."""
 
-    id: str = Field(default_factory=generate_uuid)
     name: str
     drive_folder_id: Optional[str] = None
     project_info_spreadsheet_id: Optional[str] = None
@@ -57,7 +54,6 @@ class Project(BaseModel):
 
         json_schema_extra = {
             "example": {
-                "id": "a47bc10b-58cc-4372-a567-0e02b2c3d123",
                 "name": "E-Commerce Platform",
                 "drive_folder_id": "1abCdEfGhIjKlMnOpQrStUvWxYz",
                 "project_info_spreadsheet_id": "1abCdEfGhIjKlMnOpQrStUvWxYz",
@@ -72,7 +68,6 @@ class Project(BaseModel):
 class ProjectMetaResponse(BaseModel):
     """Response model for project metadata creation."""
 
-    project_id: str
     created: datetime
     modified: datetime
     drive_folder_id: Optional[str] = None

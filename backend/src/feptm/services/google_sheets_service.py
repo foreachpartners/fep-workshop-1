@@ -1,10 +1,10 @@
 """Service for working with Google Sheets API."""
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, cast
-import os
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials as UserCredentials
@@ -24,10 +24,12 @@ class GoogleSheetsService:
         self.credentials_file = (
             settings.GOOGLE_CREDENTIALS_FILE or self._find_credentials_file()
         )
-        
+
         # Use path from settings without additional processing
-        self.token_file = settings.GOOGLE_TOKEN_FILE or Path.home() / ".google_sheets_token.json"
-        
+        self.token_file = (
+            settings.GOOGLE_TOKEN_FILE or Path.home() / ".google_sheets_token.json"
+        )
+
         self.sheets_service: Optional[Resource] = None
         self.drive_service: Optional[Resource] = None
         self.initialize()
@@ -97,7 +99,7 @@ class GoogleSheetsService:
 
         # Check if token file exists and load credentials from it
         token_path = Path(self.token_file)
-        
+
         if token_path.exists():
             try:
                 creds = UserCredentials.from_authorized_user_info(

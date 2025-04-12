@@ -26,7 +26,6 @@ def test_create_project_success(mock_settings, mock_timesheet_service, client):
     # Setup mock response data
     now = datetime.now(UTC)
     mock_response = {
-        "project_id": "mocked-project-id",
         "drive_folder_id": "mocked-folder-id",
         "drive_folder_url": "https://drive.google.com/drive/folders/mocked-folder-id",
         "project_info_spreadsheet_id": "mocked-info-sheet-id",
@@ -51,7 +50,6 @@ def test_create_project_success(mock_settings, mock_timesheet_service, client):
     
     # Verify returned data
     response_data = response.json()
-    assert response_data["project_id"] == "mocked-project-id"
     assert response_data["drive_folder_id"] == "mocked-folder-id"
     assert response_data["drive_folder_url"] == "https://drive.google.com/drive/folders/mocked-folder-id"
     assert response_data["project_info_spreadsheet_id"] == "mocked-info-sheet-id"

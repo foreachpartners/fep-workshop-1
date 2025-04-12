@@ -41,7 +41,6 @@ def test_update_project_info_sheet(mock_google_sheets_service):
     # Setup test data
     spreadsheet_id = "test-spreadsheet-id"
     project = Project(
-        id="test-project-id",
         name="Test Project",
         drive_folder_id="test-folder-id",
         project_info_spreadsheet_id="test-info-id",
@@ -68,7 +67,7 @@ def test_update_project_info_sheet(mock_google_sheets_service):
     assert len(data) > 0
     assert data[0] == ["Project Information", ""]
     assert data[1] == ["Field", "Value"]
-    assert data[2] == ["Project ID", project.id]
+    assert data[2] == ["Project ID", project.report_spreadsheet_id]
     assert data[3] == ["Name", project.name]
 
 
@@ -193,7 +192,6 @@ def test_create_project_success(mock_settings, mock_google_sheets_service):
     result = service.create_project(project)
     
     # Verify result
-    assert result["project_id"] == project.id
     assert result["drive_folder_id"] == "new-folder-id"
     assert result["drive_folder_url"] == "https://drive.google.com/drive/folders/new-folder-id"
     assert result["project_info_spreadsheet_id"] == "new-info-id"
@@ -252,7 +250,6 @@ def test_create_project_no_parent_folder(mock_settings, mock_google_sheets_servi
     result = service.create_project(project)
     
     # Verify result
-    assert result["project_id"] == project.id
     assert result["drive_folder_id"] == "root-folder-id"
     
     # Verify method calls

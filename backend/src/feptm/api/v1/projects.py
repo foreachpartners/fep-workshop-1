@@ -67,7 +67,6 @@ async def create_project(request: ProjectCreateRequest) -> ProjectMetaResponse:
 
         # Return the response
         return ProjectMetaResponse(
-            project_id=result["project_id"],
             created=project.created,
             modified=project.modified,
             drive_folder_id=result.get("drive_folder_id", ""),

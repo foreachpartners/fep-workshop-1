@@ -37,7 +37,9 @@ class TimesheetProjectService:
             project_data.append(["Field", "Value"])
 
             # Project metadata
-            project_data.append(["Project ID", project.id])
+            project_data.append(
+                ["Project ID", project.report_spreadsheet_id or "Not assigned yet"]
+            )
             project_data.append(["Name", project.name])
             project_data.append(
                 ["Created", datetime.strftime(project.created, "%Y-%m-%d %H:%M:%S UTC")]
@@ -207,7 +209,6 @@ class TimesheetProjectService:
 
             # Return all information about the created project
             return {
-                "project_id": project.id,
                 "drive_folder_id": project_folder_id,
                 "drive_folder_url": folder_info["folder_url"],
                 "project_info_spreadsheet_id": project_info["spreadsheet_id"],

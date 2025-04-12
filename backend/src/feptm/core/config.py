@@ -2,9 +2,9 @@
 
 import os
 from pathlib import Path
-from typing import Any, Optional, Union, Dict, Type
+from typing import Any, Dict, Optional, Type, Union
 
-from pydantic import Field, validator, root_validator
+from pydantic import Field, root_validator, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,7 +35,10 @@ class Settings(BaseSettings):
         ).exists()
         else None
     )
-    GOOGLE_TOKEN_FILE: Optional[Path] = Path(os.environ.get('HOME', os.path.expanduser('~'))) / ".google_sheets_token.json"
+    GOOGLE_TOKEN_FILE: Optional[Path] = (
+        Path(os.environ.get("HOME", os.path.expanduser("~")))
+        / ".google_sheets_token.json"
+    )
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_TIMESHEET_TEMPLATE_ID: Optional[str] = None

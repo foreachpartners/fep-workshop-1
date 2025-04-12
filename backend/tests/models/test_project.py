@@ -20,7 +20,6 @@ def test_project_model_creation():
     
     # Assert fields
     assert project.name == "Test Project"
-    assert project.id is not None  # UUID should be auto-generated
     assert project.drive_folder_id is None
     assert project.project_info_spreadsheet_id is None
     assert project.report_spreadsheet_id is None
@@ -34,7 +33,6 @@ def test_project_model_creation_with_all_fields():
     # Test data with all fields
     now = datetime.now(UTC)
     project_data = {
-        "id": "test-uuid-123",
         "name": "Full Project",
         "drive_folder_id": "folder-id-123",
         "project_info_spreadsheet_id": "sheet-id-123",
@@ -48,7 +46,6 @@ def test_project_model_creation_with_all_fields():
     project = Project(**project_data)
     
     # Assert fields
-    assert project.id == "test-uuid-123"
     assert project.name == "Full Project"
     assert project.drive_folder_id == "folder-id-123"
     assert project.project_info_spreadsheet_id == "sheet-id-123"
@@ -94,7 +91,6 @@ def test_project_meta_response_model():
     # Test data
     now = datetime.now(UTC)
     response_data = {
-        "project_id": "test-project-id-789",
         "created": now,
         "modified": now,
         "drive_folder_id": "folder-id-789",
@@ -111,7 +107,6 @@ def test_project_meta_response_model():
     response = ProjectMetaResponse(**response_data)
     
     # Assert fields
-    assert response.project_id == "test-project-id-789"
     assert response.created == now
     assert response.modified == now
     assert response.drive_folder_id == "folder-id-789"
@@ -128,7 +123,6 @@ def test_project_meta_response_missing_required_fields():
     """Test ProjectMetaResponse model fails with missing required fields."""
     # Test data with missing required fields
     response_data = {
-        "project_id": "test-project-id-789"
         # Missing created and modified fields
     }
     
