@@ -67,7 +67,7 @@ def test_update_project_info_sheet(mock_google_sheets_service):
     assert len(data) > 0
     assert data[0] == ["Project Information", ""]
     assert data[1] == ["Field", "Value"]
-    assert data[2] == ["Project ID", project.report_spreadsheet_id]
+    assert data[2] == ["Project ID", project.project_info_spreadsheet_id]
     assert data[3] == ["Name", project.name]
 
 

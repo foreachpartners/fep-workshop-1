@@ -38,7 +38,10 @@ class TimesheetProjectService:
 
             # Project metadata
             project_data.append(
-                ["Project ID", project.report_spreadsheet_id or "Not assigned yet"]
+                [
+                    "Project ID",
+                    project.project_info_spreadsheet_id or "Not assigned yet",
+                ]
             )
             project_data.append(["Name", project.name])
             project_data.append(
