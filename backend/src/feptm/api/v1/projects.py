@@ -18,7 +18,7 @@ class ProjectCreateRequest(BaseModel):
 
 
 @router.post("/create", response_model=ProjectMetaResponse)
-async def create_project(request: ProjectCreateRequest):
+async def create_project(request: ProjectCreateRequest) -> ProjectMetaResponse:
     """Create a new project in Google Drive.
 
     This endpoint creates:

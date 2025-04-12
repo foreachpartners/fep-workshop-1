@@ -10,7 +10,7 @@ isort:
 	uv run python -m isort src
 
 typecheck:
-	uv run mypy
+	uv run mypy src
 
 test:
 	uv run pytest $(ARGS)

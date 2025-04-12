@@ -1,6 +1,7 @@
 """Main application module for the Time & Materials accounting service."""
 
 from fastapi import FastAPI
+from typing import Dict
 
 from feptm.api.router import router as api_router
 from feptm.core.config import settings
@@ -15,6 +16,6 @@ app.include_router(api_router, prefix="/api")
 
 
 @app.get("/")
-async def root():
+async def root() -> Dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok", "message": "Time & Materials accounting service is running"}

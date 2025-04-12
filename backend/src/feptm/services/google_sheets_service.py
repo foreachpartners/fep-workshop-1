@@ -17,7 +17,7 @@ from feptm.core.config import settings
 class GoogleSheetsService:
     """Service for working with Google Sheets API."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize service with credentials."""
         self.credentials_file = (
             settings.GOOGLE_CREDENTIALS_FILE or self._find_credentials_file()
@@ -385,6 +385,7 @@ class GoogleSheetsService:
             )
 
             # Remove current parents and add new parent
+            # Convert list of parents to comma-separated string for removeParents parameter
             previous_parents = ",".join(file.get("parents", []))
             self.drive_service.files().update(
                 fileId=file_id,
