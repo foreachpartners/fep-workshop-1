@@ -84,7 +84,7 @@ class TimesheetProjectService:
             raise Exception(f"Failed to update project info sheet: {error}")
 
     def _create_spreadsheet_from_template(
-        self, template_id: str, new_title: str, folder_id: str
+        self, template_id: Optional[str], new_title: str, folder_id: str
     ) -> Dict[str, str]:
         """Helper method to create a spreadsheet from a template.
 
@@ -100,7 +100,7 @@ class TimesheetProjectService:
             Exception: If template ID is not configured or accessible
         """
         if not template_id:
-            raise Exception(f"Template ID is not configured in settings")
+            raise Exception("Template ID is not configured in settings")
 
         # Create spreadsheet from template
         result = self.google_sheets_service.ensure_spreadsheet_from_template(

@@ -3,13 +3,13 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, cast
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials as UserCredentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+from google_auth_oauthlib.flow import InstalledAppFlow  # type: ignore
+from googleapiclient.discovery import Resource, build  # type: ignore
+from googleapiclient.errors import HttpError  # type: ignore
 
 from feptm.core.config import settings
 
@@ -25,8 +25,8 @@ class GoogleSheetsService:
         self.token_file = (
             settings.GOOGLE_TOKEN_FILE or Path.home() / ".google_sheets_token.json"
         )
-        self.sheets_service = None
-        self.drive_service = None
+        self.sheets_service: Optional[Resource] = None
+        self.drive_service: Optional[Resource] = None
         self.initialize()
 
     def _find_credentials_file(self) -> str:
@@ -130,7 +130,7 @@ class GoogleSheetsService:
             )
             print(f"Saved credentials to {self.token_file}")
 
-        return creds
+        return cast(Optional[UserCredentials], creds)
 
     def create_spreadsheet(self, title: str) -> Dict[str, str]:
         """Create a new Google Sheets spreadsheet.
@@ -141,6 +141,9 @@ class GoogleSheetsService:
         Returns:
             Dictionary with spreadsheet ID and URL
         """
+        if not self.sheets_service:
+            raise Exception("Sheets service not initialized")
+
         spreadsheet_body = {
             "properties": {"title": title}
             # We don't create sheets because we copy from templates that already have the needed structure
@@ -175,6 +178,9 @@ class GoogleSheetsService:
         Returns:
             Dictionary with information about the found sheet or None if not found
         """
+        if not self.sheets_service:
+            raise Exception("Sheets service not initialized")
+
         try:
             # Get spreadsheet metadata
             spreadsheet_metadata = (
@@ -207,7 +213,7 @@ class GoogleSheetsService:
                 )
                 return None
 
-            return target_sheet
+            return cast(Dict[str, Any], target_sheet)
 
         except Exception as error:
             print(f"Error getting sheet by name: {error}")
@@ -225,8 +231,11 @@ class GoogleSheetsService:
         Returns:
             Dictionary with folder ID and URL
         """
+        if not self.drive_service:
+            raise Exception("Drive service not initialized")
+
         # Prepare folder metadata
-        folder_metadata = {
+        folder_metadata: Dict[str, Any] = {
             "name": folder_name,
             "mimeType": "application/vnd.google-apps.folder",
         }
@@ -263,6 +272,9 @@ class GoogleSheetsService:
         Returns:
             Dictionary with spreadsheet ID and URL
         """
+        if not self.drive_service:
+            raise Exception("Drive service not initialized")
+
         try:
             # Copy the spreadsheet
             copied_file = (
@@ -343,12 +355,16 @@ class GoogleSheetsService:
         Returns:
             Dictionary with file information
         """
+        if not self.drive_service:
+            raise Exception("Drive service not initialized")
+
         try:
-            return (
+            result = (
                 self.drive_service.files()
                 .get(fileId=file_id, fields="id,name,mimeType,parents")
                 .execute()
             )
+            return cast(Dict[str, Any], result)
         except HttpError as error:
             raise Exception(f"Failed to get file with ID {file_id}: {error}")
 
@@ -361,6 +377,9 @@ class GoogleSheetsService:
         Returns:
             None
         """
+        if not self.drive_service:
+            raise Exception("Drive service not initialized")
+
         try:
             self.drive_service.files().delete(fileId=file_id).execute()
         except HttpError as error:
@@ -376,6 +395,9 @@ class GoogleSheetsService:
         Returns:
             None
         """
+        if not self.drive_service:
+            raise Exception("Drive service not initialized")
+
         try:
             # First get the current parents
             file = (
@@ -386,7 +408,9 @@ class GoogleSheetsService:
 
             # Remove current parents and add new parent
             # Convert list of parents to comma-separated string for removeParents parameter
-            previous_parents = ",".join(file.get("parents", []))
+            parents_list = file.get("parents", [])
+            previous_parents = ",".join(parents_list)
+
             self.drive_service.files().update(
                 fileId=file_id,
                 addParents=folder_id,
@@ -408,6 +432,9 @@ class GoogleSheetsService:
         Returns:
             None
         """
+        if not self.sheets_service:
+            raise Exception("Sheets service not initialized")
+
         try:
             self.sheets_service.spreadsheets().values().clear(
                 spreadsheetId=spreadsheet_id, range=range_name, body={}
@@ -433,8 +460,11 @@ class GoogleSheetsService:
         Returns:
             Response from the API
         """
+        if not self.sheets_service:
+            raise Exception("Sheets service not initialized")
+
         try:
-            return (
+            result = (
                 self.sheets_service.spreadsheets()
                 .values()
                 .update(
@@ -445,6 +475,7 @@ class GoogleSheetsService:
                 )
                 .execute()
             )
+            return cast(Dict[str, Any], result)
         except HttpError as error:
             raise Exception(f"Failed to update range {range_name}: {error}")
 
@@ -461,6 +492,9 @@ class GoogleSheetsService:
         Returns:
             Response from the API
         """
+        if not self.sheets_service:
+            raise Exception("Sheets service not initialized")
+
         try:
             # Get the sheet
             sheet = self.get_sheet_by_name(spreadsheet_id, sheet_name)
@@ -485,7 +519,7 @@ class GoogleSheetsService:
                 value_input_option="USER_ENTERED",
             )
 
-            return response
+            return cast(Dict[str, Any], response)
         except Exception as error:
             raise Exception(f"Failed to update project sheet: {error}")
 
@@ -501,12 +535,16 @@ class GoogleSheetsService:
         Returns:
             Response from the API
         """
+        if not self.sheets_service:
+            raise Exception("Sheets service not initialized")
+
         try:
-            return (
+            result = (
                 self.sheets_service.spreadsheets()
                 .batchUpdate(spreadsheetId=spreadsheet_id, body={"requests": requests})
                 .execute()
             )
+            return cast(Dict[str, Any], result)
         except HttpError as error:
             raise Exception(f"Failed to batch update spreadsheet: {error}")
 

@@ -1,7 +1,8 @@
 """Main application module for the Time & Materials accounting service."""
 
-from fastapi import FastAPI
 from typing import Dict
+
+from fastapi import FastAPI
 
 from feptm.api.router import router as api_router
 from feptm.core.config import settings
