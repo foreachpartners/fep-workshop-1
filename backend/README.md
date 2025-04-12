@@ -6,6 +6,9 @@ A backend service for automating time and materials accounting using Google Shee
 
 1. Add tests
 2. Linter
+3. Logging
+4. Add documentation
+
 
 
 ## Technology Stack
