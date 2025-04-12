@@ -25,16 +25,9 @@ class GoogleSheetsService:
             settings.GOOGLE_CREDENTIALS_FILE or self._find_credentials_file()
         )
         
-        # Получаем путь к файлу токена с гарантированным раскрытием тильды
-        default_token_path = os.path.join(os.environ.get('HOME', os.path.expanduser('~')), ".google_sheets_token.json")
-        token_file = settings.GOOGLE_TOKEN_FILE or default_token_path
+        # Use path from settings without additional processing
+        self.token_file = settings.GOOGLE_TOKEN_FILE or Path.home() / ".google_sheets_token.json"
         
-        # Обрабатываем строковые значения, гарантируя расширение тильды
-        if isinstance(token_file, str) and "~" in token_file:
-            self.token_file = Path(os.path.expanduser(token_file))
-        else:
-            self.token_file = token_file
-            
         self.sheets_service: Optional[Resource] = None
         self.drive_service: Optional[Resource] = None
         self.initialize()
@@ -104,9 +97,7 @@ class GoogleSheetsService:
 
         # Check if token file exists and load credentials from it
         token_path = Path(self.token_file)
-        if isinstance(self.token_file, str) and "~" in self.token_file:
-            token_path = Path(os.path.expanduser(self.token_file))
-            
+        
         if token_path.exists():
             try:
                 creds = UserCredentials.from_authorized_user_info(
@@ -128,9 +119,6 @@ class GoogleSheetsService:
 
             # Save the credentials for the next run
             token_path = Path(self.token_file)
-            if isinstance(self.token_file, str) and "~" in self.token_file:
-                token_path = Path(os.path.expanduser(self.token_file))
-                
             token_path.parent.mkdir(parents=True, exist_ok=True)
             token_path.write_text(
                 json.dumps(

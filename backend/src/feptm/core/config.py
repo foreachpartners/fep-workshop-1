@@ -2,9 +2,9 @@
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, Union, Dict, Type
 
-from pydantic import Field, validator
+from pydantic import Field, validator, root_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,12 +59,14 @@ class Settings(BaseSettings):
         default=["Developer", "QA", "Designer", "Project Manager", "DevOps"]
     )
 
-    @validator("GOOGLE_TOKEN_FILE", pre=True)
-    def expand_user_path(cls, v):
-        """Expand user home directory in path string if needed."""
-        if isinstance(v, str) and v.startswith("~"):
-            return os.path.expanduser(v)
-        return v
+    @root_validator(pre=True)
+    def expand_all_paths(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Process all Path fields, expanding tildes and converting to Path type."""
+        for field_name, field_value in values.items():
+            if isinstance(field_value, str) and "~" in field_value:
+                # If it's a string with a tilde - expand the path
+                values[field_name] = os.path.expanduser(field_value)
+        return values
 
     model_config = SettingsConfigDict(
         env_file=".env",

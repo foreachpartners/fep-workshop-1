@@ -15,5 +15,5 @@ typecheck:
 test:
 	uv run pytest $(ARGS)
 
-# Запуск всех инструментов
+# Run all tools
 all: lint format isort typecheck test 
