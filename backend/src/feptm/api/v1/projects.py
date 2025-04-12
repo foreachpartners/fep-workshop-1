@@ -4,7 +4,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from feptm.core.config import settings
-from feptm.models import Project, ProjectMetaResponse
+from feptm.models import (
+    Project,
+    ProjectMetaResponse,
+    ProjectSyncRequest,
+    ProjectSyncResponse,
+    Specialist,
+)
 from feptm.services.google_sheets_service import google_sheets_service
 from feptm.timesheets.project_service import TimesheetProjectService
 
@@ -84,4 +90,54 @@ async def create_project(request: ProjectCreateRequest) -> ProjectMetaResponse:
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to create project: {str(e)}"
+        )
+
+
+@router.post("/sync", response_model=ProjectSyncResponse)
+async def sync_project_specialists(request: ProjectSyncRequest) -> ProjectSyncResponse:
+    """Synchronize specialists for a project.
+
+    This endpoint:
+    1. Analyzes the project's spreadsheet for specialists information
+    2. Creates timesheets for specialists who don't have them
+    3. Links the timesheets to project reports and calculations
+
+    Args:
+        request: Project sync request containing project ID
+
+    Returns:
+        Project sync response with specialists info
+
+    Raises:
+        HTTPException: If synchronization fails
+    """
+    try:
+        # Validate configuration
+        if not settings.GOOGLE_TIMESHEET_TEMPLATE_ID:
+            raise HTTPException(
+                status_code=500,
+                detail="GOOGLE_TIMESHEET_TEMPLATE_ID not configured. Please set this value in the environment variables.",
+            )
+
+        # Initialize timesheet project service
+        timesheet_service = TimesheetProjectService(google_sheets_service)
+
+        # Sync project specialists
+        specialists, total_count, created_count = (
+            timesheet_service.sync_project_specialists(project_id=request.project_id)
+        )
+
+        # Return the response
+        return ProjectSyncResponse(
+            project_id=request.project_id,
+            specialists_found=total_count,
+            specialists_created=created_count,
+            specialists=specialists,
+        )
+    except HTTPException as e:
+        # Re-raise HTTP exceptions
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to sync project specialists: {str(e)}"
         )

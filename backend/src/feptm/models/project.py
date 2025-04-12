@@ -1,9 +1,11 @@
 """Project model definitions."""
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field, computed_field
+
+from feptm.models.specialist import Specialist
 
 
 class Project(BaseModel):
@@ -78,3 +80,19 @@ class ProjectMetaResponse(BaseModel):
     report_spreadsheet_url: Optional[str] = None
     calculations_spreadsheet_id: Optional[str] = None
     calculations_spreadsheet_url: Optional[str] = None
+
+
+class ProjectSyncRequest(BaseModel):
+    """Request model for syncing project specialists."""
+
+    project_id: str
+
+
+class ProjectSyncResponse(BaseModel):
+    """Response model for project specialist sync operation."""
+
+    created: datetime = Field(default_factory=datetime.utcnow)
+    project_id: str
+    specialists_found: int
+    specialists_created: int
+    specialists: List[Specialist]
