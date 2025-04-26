@@ -275,7 +275,7 @@ class TimesheetProjectService:
             # 3. Get specialists from the project info sheet
             specialists, existing_timesheets = (
                 self.specialist_service.get_specialists_from_sheet(
-                    spreadsheet_id=project_id, sheet_name="Specialists"
+                    spreadsheet_id=project_id, sheet_name="Team"
                 )
             )
 
@@ -290,7 +290,7 @@ class TimesheetProjectService:
             # 4. Create timesheets for specialists without them
             specialists_with_new_timesheets = []
             for specialist in specialists:
-                if not specialist.timesheet_id:
+                if not specialist.timesheet:
                     # Make sure folder_id is not None
                     if not project.drive_folder_id:
                         log.warning(
@@ -312,7 +312,7 @@ class TimesheetProjectService:
             if new_timesheets_created > 0:
                 self.specialist_service.update_specialists_sheet(
                     spreadsheet_id=project_id,
-                    sheet_name="Specialists",
+                    sheet_name="Team",
                     specialists=specialists_with_new_timesheets,
                 )
 
@@ -535,15 +535,27 @@ class TimesheetProjectService:
                 spreadsheet_id=spreadsheet_id, requests=[request]
             )
 
+            # Определяем заголовки и данные для вкладки
+            headers = ["Date", "Hours", "Description", "Task"]
+            
+            # Add header row
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=f"{tab_name}!A1:D1",
+                values=[headers],
+                value_input_option="USER_ENTERED",
+            )
+            
             # Add IMPORTRANGE formula
             import_formula = (
-                f'=IMPORTRANGE("{specialist.timesheet_id}", "timesheet!A:D")'
+                f'=IMPORTRANGE("{specialist.timesheet}", "timesheet!A:D")'
             )
 
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
-                range_name=f"{tab_name}!A1",
+                range_name=f"{tab_name}!A2",
                 values=[[import_formula]],
+                value_input_option="USER_ENTERED",
             )
 
             log.info(f"Created tab for {specialist.name} in report spreadsheet")
@@ -573,15 +585,42 @@ class TimesheetProjectService:
                 spreadsheet_id=spreadsheet_id, requests=[request]
             )
 
+            # Определяем заголовки и данные для вкладки
+            headers = ["Date", "Hours", "Description", "Task"]
+            
+            # Add header row
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=f"{tab_name}!A1:D1",
+                values=[headers],
+                value_input_option="USER_ENTERED",
+            )
+            
             # Add IMPORTRANGE formula
             import_formula = (
-                f'=IMPORTRANGE("{specialist.timesheet_id}", "timesheet!A:D")'
+                f'=IMPORTRANGE("{specialist.timesheet}", "timesheet!A:D")'
             )
 
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
-                range_name=f"{tab_name}!A1",
+                range_name=f"{tab_name}!A2",
                 values=[[import_formula]],
+                value_input_option="USER_ENTERED",
+            )
+
+            # Добавим информацию о ставках специалиста
+            info_data = [
+                ["Specialist:", specialist.name],
+                ["Role:", specialist.role],
+                ["Internal Rate:", str(specialist.internal_rate)],
+                ["External Rate:", str(specialist.external_rate)],
+            ]
+            
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=f"{tab_name}!F1:G4",
+                values=info_data,
+                value_input_option="USER_ENTERED",
             )
 
             log.info(f"Created tab for {specialist.name} in calculations spreadsheet")
@@ -609,17 +648,18 @@ class TimesheetProjectService:
             if not self.google_sheets_service.sheets_service:
                 raise Exception("Google Sheets service not initialized")
 
-            # Find the Current Period tab
-            current_period_sheet = self.google_sheets_service.get_sheet_by_name(
-                spreadsheet_id=spreadsheet_id, sheet_name="Current Period"
+            # Find the sheet with the exact name from Google Sheet
+            sheet_name = "Current period"
+            sheet = self.google_sheets_service.get_sheet_by_name(
+                spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
             )
 
-            if not current_period_sheet:
-                log.warning(f"Current Period tab not found in {spreadsheet_id}")
+            if not sheet:
+                log.warning(f"{sheet_name} tab not found in {spreadsheet_id}")
                 return
 
             # Get the current data
-            range_name = "Current Period!A:D"
+            range_name = f"{sheet_name}!A1:J100"  # Получаем больше строк для анализа
             result = (
                 self.google_sheets_service.sheets_service.spreadsheets()
                 .values()
@@ -628,36 +668,242 @@ class TimesheetProjectService:
             )
 
             values = result.get("values", [])
+            if not values:
+                log.warning(f"No data found in {sheet_name} tab")
+                return
 
-            # Find the first empty row
-            first_empty_row = len(values) + 1
+            # Получаем заголовки таблицы
+            headers = values[0]
+            
+            # Ищем индексы нужных колонок
+            specialist_idx = self._find_column_index(headers, "Specialist")
+            role_idx = self._find_column_index(headers, "Specialist Role")
+            
+            if specialist_idx is None or role_idx is None:
+                log.warning("Required columns not found in Current period tab")
+                return
 
-            # Check if the specialist is already in the table
-            specialist_found = False
+            # Ищем последнюю строку перед итоговой суммой и проверяем наличие специалиста
+            last_data_row = None
+            total_row = None
+            specialist_exists = False
+            has_any_specialists = False
+            
             for i, row in enumerate(values):
-                if len(row) > 0 and row[0] == specialist.name:
-                    specialist_found = True
-                    break
-
-            if not specialist_found:
-                # Add the specialist to the table
-                specialist_data = (
-                    self.specialist_service.prepare_report_specialist_data(
-                        specialist=specialist, project_name=""  # Not used here
-                    )
-                )
-
-                # Update the sheet
-                self.google_sheets_service.update_range(
+                # Проверяем, есть ли уже этот специалист
+                if i > 0 and len(row) > specialist_idx and row[specialist_idx] == specialist.name:
+                    log.info(f"Specialist {specialist.name} already exists in row {i+1}")
+                    specialist_exists = True
+                    return  # Специалист уже есть, ничего не делаем
+                
+                # Проверяем, есть ли вообще какие-либо специалисты
+                if i > 0 and len(row) > specialist_idx and row[specialist_idx]:
+                    has_any_specialists = True
+                    last_data_row = i
+                
+                # Если находим итоговую строку (обычно содержит суммы или "Total")
+                if i > 0 and len(row) > specialist_idx:
+                    # Проверяем, является ли это итоговой строкой (обычно содержит числовые значения без имени специалиста)
+                    if (not row[specialist_idx] or row[specialist_idx] == "0" or 
+                        (len(row) > 2 and "$" in str(row[2]) and not row[0])):
+                        total_row = i
+                        break
+            
+            # Если это первый специалист в документе, используем строку 2
+            if not has_any_specialists and len(values) > 1:
+                insert_row = 1  # Строка 2 в 0-based индексации - это 1
+                # Не нужно вставлять новую строку, используем существующую
+                need_to_insert_row = False
+            else:
+                # Определяем куда вставлять нового специалиста (если уже есть специалисты)
+                if last_data_row is not None:
+                    # Вставляем после последней строки с данными
+                    insert_row = last_data_row + 1
+                else:
+                    # Если нет данных, вставляем после заголовка
+                    insert_row = 1
+                
+                # Если есть итоговая строка, вставляем перед ней
+                if total_row is not None and (insert_row is None or insert_row >= total_row):
+                    insert_row = total_row
+                
+                need_to_insert_row = True
+            
+            # Получаем ID листа для операций
+            sheet_id = sheet.get("properties", {}).get("sheetId")
+            
+            # 1. Вставляем новую строку перед итоговой (если требуется)
+            if need_to_insert_row and total_row is not None:
+                # Создаем запрос на вставку строки
+                request = {
+                    "insertDimension": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "dimension": "ROWS",
+                            "startIndex": insert_row,
+                            "endIndex": insert_row + 1
+                        },
+                        "inheritFromBefore": True
+                    }
+                }
+                
+                # Выполняем запрос
+                self.google_sheets_service.batch_update(
                     spreadsheet_id=spreadsheet_id,
-                    range_name=f"Current Period!A{first_empty_row}:D{first_empty_row}",
-                    values=specialist_data,
+                    requests=[request]
                 )
-
-                log.info(
-                    f"Added {specialist.name} to Current Period tab in {spreadsheet_id}"
+            
+            # 2. Заполняем ячейки данными специалиста
+            update_data = [""] * len(headers)
+            update_data[specialist_idx] = specialist.name
+            update_data[role_idx] = specialist.role
+            
+            # Заполняем ставку в зависимости от типа документа
+            # Для Payment Distribution документа
+            if "Client Hourly Rate (USD)" in headers and "Specialist Hourly Rate (USD)" in headers:
+                client_rate_idx = self._find_column_index(headers, "Client Hourly Rate (USD)")
+                specialist_rate_idx = self._find_column_index(headers, "Specialist Hourly Rate (USD)")
+                
+                if client_rate_idx is not None:
+                    update_data[client_rate_idx] = str(specialist.external_rate)
+                
+                if specialist_rate_idx is not None:
+                    update_data[specialist_rate_idx] = str(specialist.internal_rate)
+            
+            # Для General Expenses документа
+            elif "Hourly Rate (USD)" in headers:
+                rate_idx = self._find_column_index(headers, "Hourly Rate (USD)")
+                
+                if rate_idx is not None:
+                    update_data[rate_idx] = str(specialist.external_rate)
+            
+            # Обновляем данные
+            target_row = insert_row + 1  # 1-based индексация для диапазона
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=f"{sheet_name}!A{target_row}:{self._column_letter(len(headers)-1)}{target_row}",
+                values=[update_data],
+                value_input_option="USER_ENTERED",
+            )
+            
+            # Если это не первый специалист и мы вставили новую строку, 
+            # нужно скопировать формулы из существующей строки с данными
+            if need_to_insert_row:
+                # Используем первую строку данных (строка 2) как источник формул
+                source_row = 2
+                
+                # Если первая строка данных равна строке вставки или это итоговая строка, 
+                # то ищем другую строку для копирования
+                if source_row == target_row or (total_row is not None and source_row == total_row + 1):
+                    # Ищем другую подходящую строку с данными
+                    for i in range(2, len(values) + 1):
+                        if i != target_row and (total_row is None or i != total_row + 1):
+                            source_row = i
+                            break
+                
+                # Копируем формулы из источника в целевую строку
+                self._copy_row_formatting(
+                    spreadsheet_id=spreadsheet_id,
+                    sheet_name=sheet_name,
+                    source_row=source_row,
+                    target_row=target_row
                 )
+            
+            log.info(f"Added {specialist.name} to {sheet_name} tab in row {target_row}")
 
         except Exception as e:
             log.error(f"Error updating Current Period tab: {str(e)}")
             raise Exception(f"Failed to update Current Period tab: {str(e)}")
+            
+    def _find_column_index(self, headers: list, column_name: str) -> int:
+        """Find the index of a column by its name.
+        
+        Args:
+            headers: List of column headers
+            column_name: Name of the column to find
+            
+        Returns:
+            Index of the column or None if not found
+        """
+        for i, header in enumerate(headers):
+            if header == column_name:
+                return i
+        return None
+        
+    def _copy_row_formatting(self, spreadsheet_id: str, sheet_name: str, source_row: int, target_row: int) -> None:
+        """Copy row formatting and formulas from one row to another.
+        
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+            sheet_name: Name of the sheet
+            source_row: Source row to copy from (1-based)
+            target_row: Target row to copy to (1-based)
+            
+        Raises:
+            Exception: If copying fails
+        """
+        try:
+            # Get sheet ID for the requests
+            sheet_id = None
+            spreadsheet = (
+                self.google_sheets_service.sheets_service.spreadsheets()
+                .get(spreadsheetId=spreadsheet_id)
+                .execute()
+            )
+            
+            for sheet in spreadsheet.get("sheets", []):
+                if sheet.get("properties", {}).get("title") == sheet_name:
+                    sheet_id = sheet.get("properties", {}).get("sheetId")
+                    break
+            
+            if not sheet_id:
+                raise Exception(f"Sheet ID not found for '{sheet_name}'")
+            
+            # Prepare copy paste request
+            request = {
+                "copyPaste": {
+                    "source": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": source_row - 1,
+                        "endRowIndex": source_row,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 100  # Достаточно большое число для покрытия всех колонок
+                    },
+                    "destination": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": target_row - 1,
+                        "endRowIndex": target_row,
+                        "startColumnIndex": 0,
+                        "endColumnIndex": 100  # Достаточно большое число для покрытия всех колонок
+                    },
+                    "pasteType": "PASTE_FORMULA",
+                    "pasteOrientation": "NORMAL"
+                }
+            }
+            
+            # Execute the request
+            self.google_sheets_service.batch_update(
+                spreadsheet_id=spreadsheet_id,
+                requests=[request]
+            )
+            
+            log.info(f"Successfully copied formatting from row {source_row} to row {target_row}")
+            
+        except Exception as e:
+            log.error(f"Error copying row formatting: {str(e)}")
+            raise Exception(f"Failed to copy row formatting: {str(e)}")
+
+    def _column_letter(self, index: int) -> str:
+        """Convert column index to letter (0 = A, 1 = B, etc.).
+
+        Args:
+            index: Zero-based index
+
+        Returns:
+            Column letter(s)
+        """
+        result = ""
+        while index >= 0:
+            result = chr(index % 26 + 65) + result
+            index = index // 26 - 1
+        return result

@@ -18,13 +18,13 @@ class SpecialistService:
         self.google_sheets_service = google_sheets_service
 
     def get_specialists_from_sheet(
-        self, spreadsheet_id: str, sheet_name: str = "Specialists"
+        self, spreadsheet_id: str, sheet_name: str = "Team"
     ) -> Tuple[List[Specialist], int]:
         """Extract specialists data from a Google Sheet.
 
         Args:
             spreadsheet_id: ID of the spreadsheet containing specialists data
-            sheet_name: Name of the sheet with specialists data (default: "Specialists")
+            sheet_name: Name of the sheet with specialists data (default: "Team")
 
         Returns:
             Tuple containing list of specialist objects and count of specialists with created timesheets
@@ -67,32 +67,21 @@ class SpecialistService:
 
             # Find required column indices
             name_idx = self._find_column_index(
-                headers, ["Name", "Full Name", "ФИО", "Specialist", "Специалист"]
+                headers, ["Name"]
             )
             role_idx = self._find_column_index(
-                headers, ["Role", "Position", "Job", "Должность"]
+                headers, ["Role"]
             )
-            project_idx = self._find_column_index(headers, ["Project", "Проект"])
-            email_idx = self._find_column_index(
-                headers, ["Email", "E-mail", "Mail", "Почта"]
-            )
+            project_idx = self._find_column_index(headers, ["Project"])
             internal_rate_idx = self._find_column_index(
-                headers, ["Internal Rate", "Rate (Internal)", "Внутренняя ставка"]
+                headers, ["Internal Rate"]
             )
             external_rate_idx = self._find_column_index(
-                headers,
-                [
-                    "External Rate",
-                    "Rate (External)",
-                    "Внешняя ставка",
-                    "Rate",
-                    "Hourly Rate",
-                    "Cost",
-                ],
+                headers, ["External Rate"]
             )
-            date_idx = self._find_column_index(headers, ["Date", "Date Added", "Дата"])
+            date_idx = self._find_column_index(headers, ["Date"])
             timesheet_idx = self._find_column_index(
-                headers, ["Timesheet", "Timesheet ID", "TimesheetID"]
+                headers, ["Timesheet"]
             )
 
             # Need at least name and role
@@ -126,14 +115,9 @@ class SpecialistService:
                     if project_idx is not None and project_idx < len(row)
                     else None
                 )
-                email = (
-                    row[email_idx].strip()
-                    if email_idx is not None and email_idx < len(row)
-                    else None
-                )
 
                 # Parse date
-                date_added = None
+                date = None
                 if (
                     date_idx is not None
                     and date_idx < len(row)
@@ -141,13 +125,8 @@ class SpecialistService:
                 ):
                     date_str = row[date_idx].strip()
                     try:
-                        # Try different date formats
-                        for fmt in ["%Y-%m-%d", "%d.%m.%Y", "%m/%d/%Y"]:
-                            try:
-                                date_added = datetime.strptime(date_str, fmt)
-                                break
-                            except ValueError:
-                                continue
+                        # Use only the format from Google Sheet: "Mar 29, 2025"
+                        date = datetime.strptime(date_str, "%b %d, %Y")
                     except Exception:
                         log.warning(f"Invalid date format for {name}: {date_str}")
 
@@ -174,10 +153,10 @@ class SpecialistService:
                         )
 
                 # Get timesheet ID if available
-                timesheet_id = None
+                timesheet = None
                 if timesheet_idx is not None and timesheet_idx < len(row):
-                    timesheet_id = row[timesheet_idx].strip()
-                    if timesheet_id:
+                    timesheet = row[timesheet_idx].strip()
+                    if timesheet:
                         created_count += 1
 
                 # Skip rows with empty required fields
@@ -189,11 +168,10 @@ class SpecialistService:
                     name=name,
                     role=role,
                     project=project,
-                    email=email,
                     internal_rate=internal_rate,
                     external_rate=external_rate,
-                    date_added=date_added or datetime.utcnow(),
-                    timesheet_id=timesheet_id,
+                    date=date or datetime.utcnow(),
+                    timesheet=timesheet,
                 )
 
                 specialists.append(specialist)
@@ -239,7 +217,7 @@ class SpecialistService:
             log.info(f"Created timesheet for {specialist.name}")
 
             # Update the specialist object
-            specialist.timesheet_id = result["spreadsheet_id"]
+            specialist.timesheet = result["spreadsheet_id"]
 
             return result
         except Exception as e:
@@ -290,17 +268,17 @@ class SpecialistService:
 
             # Find column indices
             name_idx = self._find_column_index(
-                headers, ["Name", "Full Name", "ФИО", "Specialist", "Специалист"]
+                headers, ["Name"]
             )
             timesheet_idx = self._find_column_index(
-                headers, ["Timesheet", "Timesheet ID", "TimesheetID"]
+                headers, ["Timesheet"]
             )
 
             # If Timesheet column doesn't exist, add it
             if timesheet_idx is None:
                 # Add the column header
                 timesheet_idx = len(headers)
-                headers.append("Timesheet ID")
+                headers.append("Timesheet")
 
                 # Update the header row
                 self.google_sheets_service.update_range(
@@ -315,7 +293,7 @@ class SpecialistService:
 
             # Update timesheet IDs for each specialist
             for specialist in specialists:
-                if not specialist.timesheet_id:
+                if not specialist.timesheet:
                     continue
 
                 # Find this specialist in the sheet
@@ -331,7 +309,7 @@ class SpecialistService:
                             row.append("")
 
                         # Update timesheet ID
-                        row[timesheet_idx] = specialist.timesheet_id
+                        row[timesheet_idx] = specialist.timesheet
 
                         # Update this row in the sheet
                         self.google_sheets_service.update_range(
@@ -359,13 +337,11 @@ class SpecialistService:
         Returns:
             List of rows with formatted data for the report
         """
-        # Format: Name, Role, Hourly Rate, ImportRange formula
-        import_formula = f'=IMPORTRANGE("{specialist.timesheet_id}", "timesheet!A:D")'
-
-        # При передаче в Google Sheets преобразуем Decimal в строку с 2 знаками после запятой
-        external_rate_str = str(specialist.external_rate.quantize(Decimal("0.01")))
-
-        return [[specialist.name, specialist.role, external_rate_str, import_formula]]
+        # Формула IMPORTRANGE для импорта данных из таймшита специалиста
+        import_formula = f'=IMPORTRANGE("{specialist.timesheet}", "timesheet!A:D")'
+        
+        # Основная информация о специалисте для вставки в отчет
+        return [[specialist.name, specialist.role, import_formula]]
 
     def _find_column_index(
         self, headers: List[str], possible_names: List[str]
