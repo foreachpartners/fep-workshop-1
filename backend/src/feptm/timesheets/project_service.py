@@ -535,7 +535,7 @@ class TimesheetProjectService:
                 spreadsheet_id=spreadsheet_id, requests=[request]
             )
 
-            # Определяем заголовки и данные для вкладки
+            # Define headers and data for the tab
             headers = ["Date", "Hours", "Description", "Task"]
             
             # Add header row
@@ -546,9 +546,9 @@ class TimesheetProjectService:
                 value_input_option="USER_ENTERED",
             )
             
-            # Add IMPORTRANGE formula
-            import_formula = (
-                f'=IMPORTRANGE("{specialist.timesheet}", "timesheet!A:D")'
+            # Add IMPORTRANGE formula from config
+            import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
+                specialist_timesheet_id=specialist.timesheet
             )
 
             self.google_sheets_service.update_range(
@@ -585,7 +585,7 @@ class TimesheetProjectService:
                 spreadsheet_id=spreadsheet_id, requests=[request]
             )
 
-            # Определяем заголовки и данные для вкладки
+            # Define headers and data for the tab
             headers = ["Date", "Hours", "Description", "Task"]
             
             # Add header row
@@ -596,9 +596,9 @@ class TimesheetProjectService:
                 value_input_option="USER_ENTERED",
             )
             
-            # Add IMPORTRANGE formula
-            import_formula = (
-                f'=IMPORTRANGE("{specialist.timesheet}", "timesheet!A:D")'
+            # Add IMPORTRANGE formula from config
+            import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
+                specialist_timesheet_id=specialist.timesheet
             )
 
             self.google_sheets_service.update_range(
@@ -608,7 +608,7 @@ class TimesheetProjectService:
                 value_input_option="USER_ENTERED",
             )
 
-            # Добавим информацию о ставках специалиста
+            # Add specialist rate information
             info_data = [
                 ["Specialist:", specialist.name],
                 ["Role:", specialist.role],
@@ -659,7 +659,7 @@ class TimesheetProjectService:
                 return
 
             # Get the current data
-            range_name = f"{sheet_name}!A1:J100"  # Получаем больше строк для анализа
+            range_name = f"{sheet_name}!A1:J100"  # Get more rows for analysis
             result = (
                 self.google_sheets_service.sheets_service.spreadsheets()
                 .values()
@@ -672,69 +672,73 @@ class TimesheetProjectService:
                 log.warning(f"No data found in {sheet_name} tab")
                 return
 
-            # Получаем заголовки таблицы
+            # Get table headers
             headers = values[0]
             
-            # Ищем индексы нужных колонок
+            # Find indices of required columns
             specialist_idx = self._find_column_index(headers, "Specialist")
             role_idx = self._find_column_index(headers, "Specialist Role")
+            hours_worked_idx = self._find_column_index(headers, "Hours Worked")
+            
+            log.info(f"Headers: {headers}")
+            log.info(f"Hours Worked column index: {hours_worked_idx}")
             
             if specialist_idx is None or role_idx is None:
                 log.warning("Required columns not found in Current period tab")
                 return
 
-            # Ищем последнюю строку перед итоговой суммой и проверяем наличие специалиста
+            # Find the last row before the total sum and check if specialist exists
             last_data_row = None
             total_row = None
             specialist_exists = False
             has_any_specialists = False
             
             for i, row in enumerate(values):
-                # Проверяем, есть ли уже этот специалист
+                # Check if this specialist already exists
                 if i > 0 and len(row) > specialist_idx and row[specialist_idx] == specialist.name:
                     log.info(f"Specialist {specialist.name} already exists in row {i+1}")
                     specialist_exists = True
-                    return  # Специалист уже есть, ничего не делаем
+                    return  # Specialist already exists, do nothing
                 
-                # Проверяем, есть ли вообще какие-либо специалисты
+                # Check if there are any specialists
                 if i > 0 and len(row) > specialist_idx and row[specialist_idx]:
                     has_any_specialists = True
                     last_data_row = i
                 
-                # Если находим итоговую строку (обычно содержит суммы или "Total")
+                # If we find a total row (usually contains sums or "Total")
                 if i > 0 and len(row) > specialist_idx:
-                    # Проверяем, является ли это итоговой строкой (обычно содержит числовые значения без имени специалиста)
+                    # Check if this is a total row (usually has numeric values without specialist name)
                     if (not row[specialist_idx] or row[specialist_idx] == "0" or 
                         (len(row) > 2 and "$" in str(row[2]) and not row[0])):
                         total_row = i
                         break
             
-            # Если это первый специалист в документе, используем строку 2
+            # If this is the first specialist in the document, use row 2
             if not has_any_specialists and len(values) > 1:
-                insert_row = 1  # Строка 2 в 0-based индексации - это 1
-                # Не нужно вставлять новую строку, используем существующую
+                insert_row = 1  # Row 2 in 0-based indexing is 1
+                # No need to insert a new row, use existing
                 need_to_insert_row = False
             else:
-                # Определяем куда вставлять нового специалиста (если уже есть специалисты)
+                # Determine where to insert the new specialist (if there are already specialists)
                 if last_data_row is not None:
-                    # Вставляем после последней строки с данными
+                    # Insert after last data row
                     insert_row = last_data_row + 1
                 else:
-                    # Если нет данных, вставляем после заголовка
+                    # If no data, insert after header
                     insert_row = 1
                 
-                # Если есть итоговая строка, вставляем перед ней
+                # If there is a total row, insert before it
                 if total_row is not None and (insert_row is None or insert_row >= total_row):
                     insert_row = total_row
                 
                 need_to_insert_row = True
             
-            # Получаем ID листа для операций
+            # Get sheet ID for operations
             sheet_id = sheet.get("properties", {}).get("sheetId")
             
-            # 1. Вставляем новую строку перед итоговой (если требуется)
+            # 1. Insert new row before total (if needed)
             if need_to_insert_row and total_row is not None:
-                # Создаем запрос на вставку строки
+                # Create insert row request
                 request = {
                     "insertDimension": {
                         "range": {
@@ -747,19 +751,30 @@ class TimesheetProjectService:
                     }
                 }
                 
-                # Выполняем запрос
+                # Execute request
                 self.google_sheets_service.batch_update(
                     spreadsheet_id=spreadsheet_id,
                     requests=[request]
                 )
             
-            # 2. Заполняем ячейки данными специалиста
+            # 2. Fill cells with specialist data
             update_data = [""] * len(headers)
             update_data[specialist_idx] = specialist.name
             update_data[role_idx] = specialist.role
             
-            # Заполняем ставку в зависимости от типа документа
-            # Для Payment Distribution документа
+            # Add working hours formula if column exists
+            if hours_worked_idx is not None:
+                try:
+                    # Get calculation formula from config
+                    working_hours_formula = self.google_sheets_service.get_calculate_working_hours_formula()
+                    # Use formula directly without modifications
+                    update_data[hours_worked_idx] = working_hours_formula
+                    log.info(f"Set working hours formula for {specialist.name}: {working_hours_formula}")
+                except Exception as e:
+                    log.warning(f"Failed to set hours calculation formula: {str(e)}")
+            
+            # Fill rates depending on document type
+            # For Payment Distribution document
             if "Client Hourly Rate (USD)" in headers and "Specialist Hourly Rate (USD)" in headers:
                 client_rate_idx = self._find_column_index(headers, "Client Hourly Rate (USD)")
                 specialist_rate_idx = self._find_column_index(headers, "Specialist Hourly Rate (USD)")
@@ -770,15 +785,15 @@ class TimesheetProjectService:
                 if specialist_rate_idx is not None:
                     update_data[specialist_rate_idx] = str(specialist.internal_rate)
             
-            # Для General Expenses документа
+            # For General Expenses document
             elif "Hourly Rate (USD)" in headers:
                 rate_idx = self._find_column_index(headers, "Hourly Rate (USD)")
                 
                 if rate_idx is not None:
                     update_data[rate_idx] = str(specialist.external_rate)
             
-            # Обновляем данные
-            target_row = insert_row + 1  # 1-based индексация для диапазона
+            # Update data
+            target_row = insert_row + 1  # 1-based indexing for range
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
                 range_name=f"{sheet_name}!A{target_row}:{self._column_letter(len(headers)-1)}{target_row}",
@@ -786,22 +801,22 @@ class TimesheetProjectService:
                 value_input_option="USER_ENTERED",
             )
             
-            # Если это не первый специалист и мы вставили новую строку, 
-            # нужно скопировать формулы из существующей строки с данными
+            # If this is not the first specialist and we inserted a new row, 
+            # need to copy formulas from existing data row
             if need_to_insert_row:
-                # Используем первую строку данных (строка 2) как источник формул
+                # Use first data row (row 2) as formula source
                 source_row = 2
                 
-                # Если первая строка данных равна строке вставки или это итоговая строка, 
-                # то ищем другую строку для копирования
+                # If first data row equals insert row or is a total row, 
+                # then find another row for copying
                 if source_row == target_row or (total_row is not None and source_row == total_row + 1):
-                    # Ищем другую подходящую строку с данными
+                    # Find another suitable data row
                     for i in range(2, len(values) + 1):
                         if i != target_row and (total_row is None or i != total_row + 1):
                             source_row = i
                             break
                 
-                # Копируем формулы из источника в целевую строку
+                # Copy formulas from source to target row
                 self._copy_row_formatting(
                     spreadsheet_id=spreadsheet_id,
                     sheet_name=sheet_name,

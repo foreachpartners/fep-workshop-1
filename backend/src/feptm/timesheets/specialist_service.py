@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from feptm.core.config import settings
 from feptm.core.log import log
@@ -337,10 +337,12 @@ class SpecialistService:
         Returns:
             List of rows with formatted data for the report
         """
-        # Формула IMPORTRANGE для импорта данных из таймшита специалиста
-        import_formula = f'=IMPORTRANGE("{specialist.timesheet}", "timesheet!A:D")'
+        # Get IMPORTRANGE formula from config
+        import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
+            specialist_timesheet_id=specialist.timesheet
+        )
         
-        # Основная информация о специалисте для вставки в отчет
+        # Basic specialist information for report
         return [[specialist.name, specialist.role, import_formula]]
 
     def _find_column_index(
