@@ -3,7 +3,7 @@
 /backend/credentials.json
 .google_sheets_token.json
 /backend/.google_sheets_token.json
-backend/backend/credentials.json
+credentials.json
 # Created by https://www.toptal.com/developers/gitignore/api/python
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 
