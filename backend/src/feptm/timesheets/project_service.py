@@ -472,13 +472,13 @@ class TimesheetProjectService:
                         specialist,
                     )
 
-                # Update the Current Period tab in the report
-                self._update_current_period_tab(
+                # Update the Current Period tab in the report (General Expenses)
+                self._update_general_expenses_current_period_tab(
                     spreadsheet_id=project.report_spreadsheet_id, specialist=specialist
                 )
 
-                # Update the Current Period tab in the calculations
-                self._update_current_period_tab(
+                # Update the Current Period tab in the calculations (Payment Distribution)
+                self._update_payment_distribution_current_period_tab(
                     spreadsheet_id=project.calculations_spreadsheet_id,
                     specialist=specialist,
                 )
@@ -487,120 +487,13 @@ class TimesheetProjectService:
             log.error(f"Error linking specialist timesheets: {str(e)}")
             raise Exception(f"Failed to link specialist timesheets: {str(e)}")
 
-    def _get_spreadsheet_sheets(self, spreadsheet_id: str) -> List[str]:
-        """Get list of sheet names in a spreadsheet.
-
-        Args:
-            spreadsheet_id: ID of the spreadsheet
-
-        Returns:
-            List of sheet names
-        """
-        try:
-            # Check if sheets service is initialized
-            if not self.google_sheets_service.sheets_service:
-                raise Exception("Google Sheets service not initialized")
-
-            spreadsheet = (
-                self.google_sheets_service.sheets_service.spreadsheets()
-                .get(spreadsheetId=spreadsheet_id)
-                .execute()
-            )
-
-            sheets = spreadsheet.get("sheets", [])
-            return [sheet.get("properties", {}).get("title", "") for sheet in sheets]
-
-        except Exception as e:
-            log.error(f"Error getting spreadsheet sheets: {str(e)}")
-            raise Exception(f"Failed to get spreadsheet sheets: {str(e)}")
-
-    def _create_specialist_tab_in_report(
-        self, spreadsheet_id: str, tab_name: str, specialist: Specialist
-    ) -> None:
-        """Create a tab for a specialist in the report spreadsheet.
-
-        Args:
-            spreadsheet_id: ID of the report spreadsheet
-            tab_name: Name for the new tab
-            specialist: Specialist object
-
-        Raises:
-            Exception: If tab creation fails
-        """
-        try:
-            # Create a new sheet
-            request = {"addSheet": {"properties": {"title": tab_name}}}
-
-            self.google_sheets_service.batch_update(
-                spreadsheet_id=spreadsheet_id, requests=[request]
-            )
-            
-            # Add IMPORTRANGE formula directly in cell A1
-            import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
-                specialist_timesheet_id=specialist.timesheet
-            )
-
-            self.google_sheets_service.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=f"{tab_name}!A1",
-                values=[[import_formula]],
-                value_input_option="USER_ENTERED",
-            )
-
-            log.info(f"Created tab for {specialist.name} in report spreadsheet")
-
-        except Exception as e:
-            log.error(f"Error creating specialist tab in report: {str(e)}")
-            raise Exception(f"Failed to create specialist tab in report: {str(e)}")
-
-    def _create_specialist_tab_in_calculations(
-        self, spreadsheet_id: str, tab_name: str, specialist: Specialist
-    ) -> None:
-        """Create a tab for a specialist in the calculations spreadsheet.
-
-        Args:
-            spreadsheet_id: ID of the calculations spreadsheet
-            tab_name: Name for the new tab
-            specialist: Specialist object
-
-        Raises:
-            Exception: If tab creation fails
-        """
-        try:
-            # Create a new sheet
-            request = {"addSheet": {"properties": {"title": tab_name}}}
-
-            self.google_sheets_service.batch_update(
-                spreadsheet_id=spreadsheet_id, requests=[request]
-            )
-            
-            # Add IMPORTRANGE formula directly in cell A1
-            import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
-                specialist_timesheet_id=specialist.timesheet
-            )
-
-            self.google_sheets_service.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=f"{tab_name}!A1",
-                values=[[import_formula]],
-                value_input_option="USER_ENTERED",
-            )
-
-            log.info(f"Created tab for {specialist.name} in calculations spreadsheet")
-
-        except Exception as e:
-            log.error(f"Error creating specialist tab in calculations: {str(e)}")
-            raise Exception(
-                f"Failed to create specialist tab in calculations: {str(e)}"
-            )
-
-    def _update_current_period_tab(
+    def _update_general_expenses_current_period_tab(
         self, spreadsheet_id: str, specialist: Specialist
     ) -> None:
-        """Update the Current Period tab with the specialist.
+        """Update the Current Period tab in General Expenses spreadsheet with the specialist.
 
         Args:
-            spreadsheet_id: ID of the spreadsheet
+            spreadsheet_id: ID of the General Expenses spreadsheet
             specialist: Specialist object
 
         Raises:
@@ -736,24 +629,11 @@ class TimesheetProjectService:
                 except Exception as e:
                     log.warning(f"Failed to set hours calculation formula: {str(e)}")
             
-            # Fill rates depending on document type
-            # For Payment Distribution document
-            if "Client Hourly Rate (USD)" in headers and "Specialist Hourly Rate (USD)" in headers:
-                client_rate_idx = self._find_column_index(headers, "Client Hourly Rate (USD)")
-                specialist_rate_idx = self._find_column_index(headers, "Specialist Hourly Rate (USD)")
-                
-                if client_rate_idx is not None:
-                    update_data[client_rate_idx] = str(specialist.external_rate)
-                
-                if specialist_rate_idx is not None:
-                    update_data[specialist_rate_idx] = str(specialist.internal_rate)
-            
             # For General Expenses document
-            elif "Hourly Rate (USD)" in headers:
-                rate_idx = self._find_column_index(headers, "Hourly Rate (USD)")
-                
-                if rate_idx is not None:
-                    update_data[rate_idx] = str(specialist.external_rate)
+            rate_idx = self._find_column_index(headers, "Hourly Rate (USD)")
+            
+            if rate_idx is not None:
+                update_data[rate_idx] = str(specialist.external_rate)
             
             # Update data
             target_row = insert_row + 1  # 1-based indexing for range
@@ -764,34 +644,318 @@ class TimesheetProjectService:
                 value_input_option="USER_ENTERED",
             )
             
-            # If this is not the first specialist and we inserted a new row, 
-            # need to copy formulas from existing data row
-            if need_to_insert_row:
-                # Use first data row (row 2) as formula source
-                source_row = 2
+            log.info(f"Added {specialist.name} to {sheet_name} tab in row {target_row}")
+
+        except Exception as e:
+            log.error(f"Error updating General Expenses Current Period tab: {str(e)}")
+            raise Exception(f"Failed to update General Expenses Current Period tab: {str(e)}")
+            
+    def _update_payment_distribution_current_period_tab(
+        self, spreadsheet_id: str, specialist: Specialist
+    ) -> None:
+        """Update the Current Period tab in Payment Distribution spreadsheet with the specialist.
+
+        Args:
+            spreadsheet_id: ID of the Payment Distribution spreadsheet
+            specialist: Specialist object
+
+        Raises:
+            Exception: If update fails
+        """
+        try:
+            # Check if sheets service is initialized
+            if not self.google_sheets_service.sheets_service:
+                raise Exception("Google Sheets service not initialized")
+
+            # Find the sheet with the exact name from Google Sheet
+            sheet_name = "Current period"
+            sheet = self.google_sheets_service.get_sheet_by_name(
+                spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
+            )
+
+            if not sheet:
+                log.warning(f"{sheet_name} tab not found in {spreadsheet_id}")
+                return
+
+            # Get the current data
+            range_name = f"{sheet_name}!A1:J100"  # Get more rows for analysis
+            result = (
+                self.google_sheets_service.sheets_service.spreadsheets()
+                .values()
+                .get(spreadsheetId=spreadsheet_id, range=range_name)
+                .execute()
+            )
+
+            values = result.get("values", [])
+            if not values:
+                log.warning(f"No data found in {sheet_name} tab")
+                return
+
+            # Get table headers
+            headers = values[0]
+            
+            # Find indices of required columns
+            specialist_idx = self._find_column_index(headers, "Specialist")
+            role_idx = self._find_column_index(headers, "Specialist Role")
+            hours_worked_idx = self._find_column_index(headers, "Hours Worked")
+            
+            log.info(f"Headers: {headers}")
+            log.info(f"Hours Worked column index: {hours_worked_idx}")
+            
+            if specialist_idx is None or role_idx is None:
+                log.warning("Required columns not found in Current period tab")
+                return
+
+            # Find the last row before the total sum and check if specialist exists
+            last_data_row = None
+            total_row = None
+            specialist_exists = False
+            has_any_specialists = False
+            
+            for i, row in enumerate(values):
+                # Check if this specialist already exists
+                if i > 0 and len(row) > specialist_idx and row[specialist_idx] == specialist.name:
+                    log.info(f"Specialist {specialist.name} already exists in row {i+1}")
+                    specialist_exists = True
+                    return  # Specialist already exists, do nothing
                 
-                # If first data row equals insert row or is a total row, 
-                # then find another row for copying
-                if source_row == target_row or (total_row is not None and source_row == total_row + 1):
-                    # Find another suitable data row
-                    for i in range(2, len(values) + 1):
-                        if i != target_row and (total_row is None or i != total_row + 1):
-                            source_row = i
-                            break
+                # Check if there are any specialists
+                if i > 0 and len(row) > specialist_idx and row[specialist_idx]:
+                    has_any_specialists = True
+                    last_data_row = i
                 
-                # Copy formulas from source to target row
-                self._copy_row_formatting(
+                # If we find a total row (usually contains sums or "Total")
+                if i > 0 and len(row) > specialist_idx:
+                    # Check if this is a total row (usually has numeric values without specialist name)
+                    if (not row[specialist_idx] or row[specialist_idx] == "0" or 
+                        (len(row) > 2 and "$" in str(row[2]) and not row[0])):
+                        total_row = i
+                        break
+            
+            # If this is the first specialist in the document, use row 2
+            if not has_any_specialists and len(values) > 1:
+                insert_row = 1  # Row 2 in 0-based indexing is 1
+                # No need to insert a new row, use existing
+                need_to_insert_row = False
+            else:
+                # Determine where to insert the new specialist (if there are already specialists)
+                if last_data_row is not None:
+                    # Insert after last data row
+                    insert_row = last_data_row + 1
+                else:
+                    # If no data, insert after header
+                    insert_row = 1
+                
+                # If there is a total row, insert before it
+                if total_row is not None and (insert_row is None or insert_row >= total_row):
+                    insert_row = total_row
+                
+                need_to_insert_row = True
+            
+            # Get sheet ID for operations
+            sheet_id = sheet.get("properties", {}).get("sheetId")
+            
+            # 1. Insert new row before total (if needed)
+            if need_to_insert_row and total_row is not None:
+                # Create insert row request
+                request = {
+                    "insertDimension": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "dimension": "ROWS",
+                            "startIndex": insert_row,
+                            "endIndex": insert_row + 1
+                        },
+                        "inheritFromBefore": True
+                    }
+                }
+                
+                # Execute request
+                self.google_sheets_service.batch_update(
                     spreadsheet_id=spreadsheet_id,
-                    sheet_name=sheet_name,
-                    source_row=source_row,
-                    target_row=target_row
+                    requests=[request]
                 )
+            
+            # 2. Fill cells with specialist data
+            update_data = [""] * len(headers)
+            update_data[specialist_idx] = specialist.name
+            update_data[role_idx] = specialist.role
+            
+            # Add working hours formula if column exists
+            if hours_worked_idx is not None:
+                try:
+                    # Get calculation formula from config
+                    working_hours_formula = self.google_sheets_service.get_calculate_working_hours_formula()
+                    # Use formula directly without modifications
+                    update_data[hours_worked_idx] = working_hours_formula
+                    log.info(f"Set working hours formula for {specialist.name}: {working_hours_formula}")
+                except Exception as e:
+                    log.warning(f"Failed to set hours calculation formula: {str(e)}")
+            
+            # For Payment Distribution document
+            client_rate_idx = self._find_column_index(headers, "Client Hourly Rate (USD)")
+            specialist_rate_idx = self._find_column_index(headers, "Specialist Hourly Rate (USD)")
+            
+            if client_rate_idx is not None:
+                update_data[client_rate_idx] = str(specialist.external_rate)
+            
+            if specialist_rate_idx is not None:
+                update_data[specialist_rate_idx] = str(specialist.internal_rate)
+            
+            # Add formulas for cost and revenue calculations
+            client_work_cost_idx = self._find_column_index(headers, "Client Work Cost (USD)")
+            specialist_work_cost_idx = self._find_column_index(headers, "Specialist Work Cost (USD)")
+            revenue_idx = self._find_column_index(headers, "Revenue (USD)")
+            
+            try:
+                # Get formulas from config using the generic get_formula method
+                if client_work_cost_idx is not None:
+                    try:
+                        client_work_cost_formula = self.google_sheets_service.get_formula("Client Work Cost")
+                        update_data[client_work_cost_idx] = client_work_cost_formula
+                        log.info(f"Set client work cost formula for {specialist.name}: {client_work_cost_formula}")
+                    except Exception as e:
+                        log.warning(f"Failed to set client work cost formula: {str(e)}")
+                
+                if specialist_work_cost_idx is not None:
+                    try:
+                        specialist_work_cost_formula = self.google_sheets_service.get_formula("Specialist Work Cost")
+                        update_data[specialist_work_cost_idx] = specialist_work_cost_formula
+                        log.info(f"Set specialist work cost formula for {specialist.name}: {specialist_work_cost_formula}")
+                    except Exception as e:
+                        log.warning(f"Failed to set specialist work cost formula: {str(e)}")
+                
+                if revenue_idx is not None:
+                    try:
+                        revenue_formula = self.google_sheets_service.get_formula("Revenue")
+                        update_data[revenue_idx] = revenue_formula
+                        log.info(f"Set revenue formula for {specialist.name}: {revenue_formula}")
+                    except Exception as e:
+                        log.warning(f"Failed to set revenue formula: {str(e)}")
+            except Exception as e:
+                log.warning(f"Failed to set one or more cost/revenue formulas: {str(e)}")
+            
+            # Update data
+            target_row = insert_row + 1  # 1-based indexing for range
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=f"{sheet_name}!A{target_row}:{self._column_letter(len(headers)-1)}{target_row}",
+                values=[update_data],
+                value_input_option="USER_ENTERED",
+            )
             
             log.info(f"Added {specialist.name} to {sheet_name} tab in row {target_row}")
 
         except Exception as e:
-            log.error(f"Error updating Current Period tab: {str(e)}")
-            raise Exception(f"Failed to update Current Period tab: {str(e)}")
+            log.error(f"Error updating Payment Distribution Current Period tab: {str(e)}")
+            raise Exception(f"Failed to update Payment Distribution Current Period tab: {str(e)}")
+            
+    def _get_spreadsheet_sheets(self, spreadsheet_id: str) -> List[str]:
+        """Get list of sheet names in a spreadsheet.
+
+        Args:
+            spreadsheet_id: ID of the spreadsheet
+
+        Returns:
+            List of sheet names
+        """
+        try:
+            # Check if sheets service is initialized
+            if not self.google_sheets_service.sheets_service:
+                raise Exception("Google Sheets service not initialized")
+
+            spreadsheet = (
+                self.google_sheets_service.sheets_service.spreadsheets()
+                .get(spreadsheetId=spreadsheet_id)
+                .execute()
+            )
+
+            sheets = spreadsheet.get("sheets", [])
+            return [sheet.get("properties", {}).get("title", "") for sheet in sheets]
+
+        except Exception as e:
+            log.error(f"Error getting spreadsheet sheets: {str(e)}")
+            raise Exception(f"Failed to get spreadsheet sheets: {str(e)}")
+
+    def _create_specialist_tab_in_report(
+        self, spreadsheet_id: str, tab_name: str, specialist: Specialist
+    ) -> None:
+        """Create a tab for a specialist in the report spreadsheet.
+
+        Args:
+            spreadsheet_id: ID of the report spreadsheet
+            tab_name: Name for the new tab
+            specialist: Specialist object
+
+        Raises:
+            Exception: If tab creation fails
+        """
+        try:
+            # Create a new sheet
+            request = {"addSheet": {"properties": {"title": tab_name}}}
+
+            self.google_sheets_service.batch_update(
+                spreadsheet_id=spreadsheet_id, requests=[request]
+            )
+            
+            # Add IMPORTRANGE formula directly in cell A1
+            import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
+                specialist_timesheet_id=specialist.timesheet
+            )
+
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=f"{tab_name}!A1",
+                values=[[import_formula]],
+                value_input_option="USER_ENTERED",
+            )
+
+            log.info(f"Created tab for {specialist.name} in report spreadsheet")
+
+        except Exception as e:
+            log.error(f"Error creating specialist tab in report: {str(e)}")
+            raise Exception(f"Failed to create specialist tab in report: {str(e)}")
+
+    def _create_specialist_tab_in_calculations(
+        self, spreadsheet_id: str, tab_name: str, specialist: Specialist
+    ) -> None:
+        """Create a tab for a specialist in the calculations spreadsheet.
+
+        Args:
+            spreadsheet_id: ID of the calculations spreadsheet
+            tab_name: Name for the new tab
+            specialist: Specialist object
+
+        Raises:
+            Exception: If tab creation fails
+        """
+        try:
+            # Create a new sheet
+            request = {"addSheet": {"properties": {"title": tab_name}}}
+
+            self.google_sheets_service.batch_update(
+                spreadsheet_id=spreadsheet_id, requests=[request]
+            )
+            
+            # Add IMPORTRANGE formula directly in cell A1
+            import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
+                specialist_timesheet_id=specialist.timesheet
+            )
+
+            self.google_sheets_service.update_range(
+                spreadsheet_id=spreadsheet_id,
+                range_name=f"{tab_name}!A1",
+                values=[[import_formula]],
+                value_input_option="USER_ENTERED",
+            )
+
+            log.info(f"Created tab for {specialist.name} in calculations spreadsheet")
+
+        except Exception as e:
+            log.error(f"Error creating specialist tab in calculations: {str(e)}")
+            raise Exception(
+                f"Failed to create specialist tab in calculations: {str(e)}"
+            )
             
     def _find_column_index(self, headers: list, column_name: str) -> int:
         """Find the index of a column by its name.
