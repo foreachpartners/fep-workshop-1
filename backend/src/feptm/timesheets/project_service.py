@@ -573,42 +573,16 @@ class TimesheetProjectService:
             self.google_sheets_service.batch_update(
                 spreadsheet_id=spreadsheet_id, requests=[request]
             )
-
-            # Define headers and data for the tab
-            headers = ["Date", "Hours", "Description", "Task"]
             
-            # Add header row
-            self.google_sheets_service.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=f"{tab_name}!A1:D1",
-                values=[headers],
-                value_input_option="USER_ENTERED",
-            )
-            
-            # Add IMPORTRANGE formula from config
+            # Add IMPORTRANGE formula directly in cell A1
             import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
                 specialist_timesheet_id=specialist.timesheet
             )
 
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
-                range_name=f"{tab_name}!A2",
+                range_name=f"{tab_name}!A1",
                 values=[[import_formula]],
-                value_input_option="USER_ENTERED",
-            )
-
-            # Add specialist rate information
-            info_data = [
-                ["Specialist:", specialist.name],
-                ["Role:", specialist.role],
-                ["Internal Rate:", str(specialist.internal_rate)],
-                ["External Rate:", str(specialist.external_rate)],
-            ]
-            
-            self.google_sheets_service.update_range(
-                spreadsheet_id=spreadsheet_id,
-                range_name=f"{tab_name}!F1:G4",
-                values=info_data,
                 value_input_option="USER_ENTERED",
             )
 
