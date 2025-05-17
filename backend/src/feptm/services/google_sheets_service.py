@@ -563,61 +563,6 @@ class GoogleSheetsService:
         """
         return self.drive_service is not None and self.sheets_service is not None
 
-    def get_formula(self, formula_name: str) -> str:
-        """Get a formula by name from the configuration spreadsheet.
-        
-        Args:
-            formula_name: Name of the formula to retrieve
-            
-        Returns:
-            The formula value
-            
-        Raises:
-            Exception: If formula not found or configuration sheet not set
-        """
-        if not settings.GOOGLE_CONFIG_SHEET_ID:
-            raise Exception("GOOGLE_CONFIG_SHEET_ID not set in environment variables")
-            
-        if not self.sheets_service:
-            raise Exception("Google Sheets service not initialized")
-            
-        try:
-            # Find the "Formulas" sheet
-            sheet = self.get_sheet_by_name(
-                spreadsheet_id=settings.GOOGLE_CONFIG_SHEET_ID,
-                sheet_name="Formulas"
-            )
-            
-            if not sheet:
-                raise Exception("Formulas sheet not found in the configuration spreadsheet")
-                
-            # Get the formulas data
-            result = (
-                self.sheets_service.spreadsheets()
-                .values()
-                .get(spreadsheetId=settings.GOOGLE_CONFIG_SHEET_ID, range="Formulas!A:C")
-                .execute()
-            )
-                
-            values = result.get("values", [])
-            if not values or len(values) <= 1:  # Check if we have data (besides header)
-                raise Exception("No formulas found in the configuration spreadsheet")
-                
-            # Skip header row and process formulas
-            for row in values[1:]:
-                if len(row) >= 2:  # Should have at least formula name and value
-                    current_formula_name = row[0].strip()
-                    formula_value = row[1].strip()
-                    if current_formula_name == formula_name and formula_value:
-                        return formula_value
-                        
-            # If we get here, the formula was not found
-            raise Exception(f"Formula '{formula_name}' not found in configuration spreadsheet")
-                
-        except Exception as e:
-            log.error(f"Error getting formula: {str(e)}")
-            raise
-
 
 # Create singleton instance
 google_sheets_service = GoogleSheetsService()

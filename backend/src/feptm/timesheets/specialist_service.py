@@ -8,6 +8,7 @@ from feptm.core.config import settings
 from feptm.core.log import log
 from feptm.models.specialist import Specialist
 from feptm.services.google_sheets_service import GoogleSheetsService
+from feptm.timesheets.config_service import config_service, FormulaName
 
 
 class SpecialistService:
@@ -338,8 +339,9 @@ class SpecialistService:
             List of rows with formatted data for the report
         """
         # Get IMPORTRANGE formula from config
-        import_formula = self.google_sheets_service.get_formula("Import specialist timesheet")
-        import_formula = import_formula.replace("SpecialistSpreadsheetID", specialist.timesheet)
+        import_formula = config_service.get_import_specialist_timesheet_formula(
+            specialist_timesheet_id=specialist.timesheet
+        )
         
         # Basic specialist information for report
         return [[specialist.name, specialist.role, import_formula]]

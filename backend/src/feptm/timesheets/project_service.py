@@ -8,6 +8,7 @@ from feptm.core.log import log
 from feptm.models.project import Project
 from feptm.models.specialist import Specialist
 from feptm.services.google_sheets_service import GoogleSheetsService
+from feptm.timesheets.config_service import config_service, FormulaName
 from feptm.timesheets.specialist_service import SpecialistService
 
 
@@ -622,7 +623,7 @@ class TimesheetProjectService:
             if hours_worked_idx is not None:
                 try:
                     # Get calculation formula from config
-                    working_hours_formula = self.google_sheets_service.get_formula("Calculate working hours")
+                    working_hours_formula = config_service.get_formula(FormulaName.CALCULATE_WORKING_HOURS)
                     # Use formula directly without modifications
                     update_data[hours_worked_idx] = working_hours_formula
                     log.info(f"Set working hours formula for {specialist.name}: {working_hours_formula}")
@@ -639,7 +640,7 @@ class TimesheetProjectService:
             # Add Gross total cost formula if total cost column exists
             if total_cost_idx is not None:
                 try:
-                    gross_total_cost_formula = self.google_sheets_service.get_formula("Gross total cost")
+                    gross_total_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
                     update_data[total_cost_idx] = gross_total_cost_formula
                     log.info(f"Set total cost formula for {specialist.name}: {gross_total_cost_formula}")
                 except Exception as e:
@@ -795,7 +796,7 @@ class TimesheetProjectService:
             if hours_worked_idx is not None:
                 try:
                     # Get calculation formula from config
-                    working_hours_formula = self.google_sheets_service.get_formula("Calculate working hours")
+                    working_hours_formula = config_service.get_formula(FormulaName.CALCULATE_WORKING_HOURS)
                     # Use formula directly without modifications
                     update_data[hours_worked_idx] = working_hours_formula
                     log.info(f"Set working hours formula for {specialist.name}: {working_hours_formula}")
@@ -821,7 +822,7 @@ class TimesheetProjectService:
                 # Get formulas from config using the generic get_formula method
                 if client_work_cost_idx is not None:
                     try:
-                        client_work_cost_formula = self.google_sheets_service.get_formula("Gross total cost")
+                        client_work_cost_formula = config_service.get_formula(FormulaName.GROSS_TOTAL_COST)
                         update_data[client_work_cost_idx] = client_work_cost_formula
                         log.info(f"Set client work cost formula for {specialist.name}: {client_work_cost_formula}")
                     except Exception as e:
@@ -829,7 +830,7 @@ class TimesheetProjectService:
                 
                 if specialist_work_cost_idx is not None:
                     try:
-                        specialist_work_cost_formula = self.google_sheets_service.get_formula("Net total cost")
+                        specialist_work_cost_formula = config_service.get_formula(FormulaName.NET_TOTAL_COST)
                         update_data[specialist_work_cost_idx] = specialist_work_cost_formula
                         log.info(f"Set specialist work cost formula for {specialist.name}: {specialist_work_cost_formula}")
                     except Exception as e:
@@ -837,7 +838,7 @@ class TimesheetProjectService:
                 
                 if revenue_idx is not None:
                     try:
-                        revenue_formula = self.google_sheets_service.get_formula("Revenue")
+                        revenue_formula = config_service.get_formula(FormulaName.REVENUE)
                         update_data[revenue_idx] = revenue_formula
                         log.info(f"Set revenue formula for {specialist.name}: {revenue_formula}")
                     except Exception as e:
@@ -909,8 +910,9 @@ class TimesheetProjectService:
             )
             
             # Add IMPORTRANGE formula directly in cell A1
-            import_formula = self.google_sheets_service.get_formula("Import specialist timesheet")
-            import_formula = import_formula.replace("SpecialistSpreadsheetID", specialist.timesheet)
+            import_formula = config_service.get_import_specialist_timesheet_formula(
+                specialist_timesheet_id=specialist.timesheet
+            )
 
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
@@ -947,8 +949,9 @@ class TimesheetProjectService:
             )
             
             # Add IMPORTRANGE formula directly in cell A1
-            import_formula = self.google_sheets_service.get_formula("Import specialist timesheet")
-            import_formula = import_formula.replace("SpecialistSpreadsheetID", specialist.timesheet)
+            import_formula = config_service.get_import_specialist_timesheet_formula(
+                specialist_timesheet_id=specialist.timesheet
+            )
 
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
