@@ -811,7 +811,7 @@ class TimesheetProjectService:
                 # Get formulas from config using the generic get_formula method
                 if client_work_cost_idx is not None:
                     try:
-                        client_work_cost_formula = self.google_sheets_service.get_formula("Client Work Cost")
+                        client_work_cost_formula = self.google_sheets_service.get_formula("Gross total cost")
                         update_data[client_work_cost_idx] = client_work_cost_formula
                         log.info(f"Set client work cost formula for {specialist.name}: {client_work_cost_formula}")
                     except Exception as e:
@@ -819,7 +819,7 @@ class TimesheetProjectService:
                 
                 if specialist_work_cost_idx is not None:
                     try:
-                        specialist_work_cost_formula = self.google_sheets_service.get_formula("Specialist Work Cost")
+                        specialist_work_cost_formula = self.google_sheets_service.get_formula("Net total cost")
                         update_data[specialist_work_cost_idx] = specialist_work_cost_formula
                         log.info(f"Set specialist work cost formula for {specialist.name}: {specialist_work_cost_formula}")
                     except Exception as e:

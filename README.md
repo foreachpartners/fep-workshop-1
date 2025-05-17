@@ -182,3 +182,11 @@ GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID=your_calculations_template_id
 2. Проверьте настройки доступа к документам (должен быть включен доступ по ссылке)
 3. Проверьте, что учетная запись Google, используемая для авторизации, может просматривать эти документы
 4. Убедитесь, что OAuth-скоупы в приложении включают необходимые разрешения (`https://www.googleapis.com/auth/drive.file` и `https://www.googleapis.com/auth/spreadsheets`)
+
+
+# TODO:
+1. Calculate sheet settings 
+2. Google token expiration handling
+3. Align terms of reports
+4. Validate that all data required for operations exists
+5. Get rid of string litterals in config
