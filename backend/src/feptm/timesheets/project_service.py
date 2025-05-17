@@ -205,14 +205,14 @@ class TimesheetProjectService:
             project.modified = datetime.utcnow()
 
             # Update main project information
-            log.info(f"Updating project info with links to related documents:")
-            log.info(f"  - Project name: {project_name}")
-            log.info(f"  - Project info URL: {project_info['spreadsheet_url']}")
             log.info(
-                f"  - Folder URL: https://drive.google.com/drive/folders/{project_folder_id}"
+                f"Updating project info with links to related documents:\n"
+                f"  - Project name: {project_name}\n"
+                f"  - Project info URL: {project_info['spreadsheet_url']}\n"
+                f"  - Folder URL: https://drive.google.com/drive/folders/{project_folder_id}\n"
+                f"  - Calculations URL: {calculations['spreadsheet_url']}\n"
+                f"  - Report URL: {report['spreadsheet_url']}"
             )
-            log.info(f"  - Calculations URL: {calculations['spreadsheet_url']}")
-            log.info(f"  - Report URL: {report['spreadsheet_url']}")
 
             self.update_project_info_sheet(project_info["spreadsheet_id"], project)
             log.info(f"Project info updated successfully")
@@ -292,23 +292,10 @@ class TimesheetProjectService:
             )
 
             # 4. Create timesheets for specialists without them
-            specialists_with_new_timesheets = []
-            for specialist in specialists:
-                if not specialist.timesheet:
-                    # Make sure folder_id is not None
-                    if not project.drive_folder_id:
-                        log.warning(
-                            "Project drive folder ID is None, can't create timesheets"
-                        )
-                        break
-
-                    # Create timesheet
-                    result = self.specialist_service.create_specialist_timesheet(
-                        specialist=specialist,
-                        project_name=project.name,
-                        folder_id=project.drive_folder_id,
-                    )
-                    specialists_with_new_timesheets.append(specialist)
+            specialists_with_new_timesheets = self._create_specialist_timesheets(
+                project=project,
+                specialists=specialists
+            )
 
             new_timesheets_created = len(specialists_with_new_timesheets)
 
@@ -331,6 +318,40 @@ class TimesheetProjectService:
         except Exception as e:
             log.error(f"Error syncing project specialists: {str(e)}")
             raise Exception(f"Failed to sync project specialists: {str(e)}")
+
+    def _create_specialist_timesheets(self, project: Project, specialists: List[Specialist]) -> List[Specialist]:
+        """Helper method to create timesheets for specialists without them.
+        
+        Args:
+            project: Project object with folder_id
+            specialists: List of specialists to check and create timesheets for
+            
+        Returns:
+            List of specialists for which timesheets were created
+            
+        Raises:
+            Exception: If folder_id is None or timesheet creation fails
+        """
+        specialists_with_new_timesheets = []
+        
+        for specialist in specialists:
+            if not specialist.timesheet:
+                # Make sure folder_id is not None
+                if not project.drive_folder_id:
+                    log.warning(
+                        "Project drive folder ID is None, can't create timesheets"
+                    )
+                    break
+
+                # Create timesheet
+                result = self.specialist_service.create_specialist_timesheet(
+                    specialist=specialist,
+                    project_name=project.name,
+                    folder_id=project.drive_folder_id,
+                )
+                specialists_with_new_timesheets.append(specialist)
+                
+        return specialists_with_new_timesheets
 
     def _extract_project_metadata(self, project_id: str) -> Project:
         """Extract project metadata from project info sheet.
