@@ -631,9 +631,19 @@ class TimesheetProjectService:
             
             # For General Expenses document
             rate_idx = self._find_column_index(headers, "Hourly Rate (USD)")
+            total_cost_idx = self._find_column_index(headers, "Total Cost (USD)")
             
             if rate_idx is not None:
                 update_data[rate_idx] = str(specialist.external_rate)
+                
+            # Add Gross total cost formula if total cost column exists
+            if total_cost_idx is not None:
+                try:
+                    gross_total_cost_formula = self.google_sheets_service.get_formula("Gross total cost")
+                    update_data[total_cost_idx] = gross_total_cost_formula
+                    log.info(f"Set total cost formula for {specialist.name}: {gross_total_cost_formula}")
+                except Exception as e:
+                    log.warning(f"Failed to set total cost formula: {str(e)}")
             
             # Update data
             target_row = insert_row + 1  # 1-based indexing for range
