@@ -8,7 +8,10 @@ from feptm.core.log import log
 from feptm.models.project import Project
 from feptm.models.specialist import Specialist
 from feptm.services.google_sheets_service import GoogleSheetsService
-from feptm.timesheets.config_service import config_service, FormulaName
+from feptm.timesheets.config_service import (
+    config_service, FormulaName, SheetName, ColumnName, 
+    DateFormat, RangeFormat, RowName, UrlPattern
+)
 from feptm.timesheets.specialist_service import SpecialistService
 
 
@@ -38,46 +41,46 @@ class TimesheetProjectService:
             project_data.append(["Project Information", ""])
 
             # Headers
-            project_data.append(["Field", "Value"])
+            project_data.append([RowName.FIELD.value, RowName.VALUE.value])
 
             # Project metadata
             project_data.append(
                 [
-                    "Project ID",
+                    RowName.PROJECT_ID.value,
                     project.project_info_spreadsheet_id or "Not assigned yet",
                 ]
             )
-            project_data.append(["Name", project.name])
+            project_data.append([RowName.NAME.value, project.name])
             project_data.append(
-                ["Created", datetime.strftime(project.created, "%Y-%m-%d %H:%M:%S UTC")]
+                [RowName.CREATED.value, datetime.strftime(project.created, DateFormat.DISPLAY_DATETIME.value)]
             )
             project_data.append(
                 [
-                    "Modified",
-                    datetime.strftime(project.modified, "%Y-%m-%d %H:%M:%S UTC"),
+                    RowName.MODIFIED.value,
+                    datetime.strftime(project.modified, DateFormat.DISPLAY_DATETIME.value),
                 ]
             )
 
             # Add hyperlink to Google Drive folder if available
             folder_url = (
-                f"https://drive.google.com/drive/folders/{project.drive_folder_id}"
+                UrlPattern.DRIVE_FOLDER.format(folder_id=project.drive_folder_id)
                 if project.drive_folder_id
                 else ""
             )
             project_data.append(
-                ["Project Folder", f'=HYPERLINK("{folder_url}"; "{folder_url}")']
+                [RowName.PROJECT_FOLDER.value, f'=HYPERLINK("{folder_url}"; "{folder_url}")']
             )
 
             # Add links to created documents
             project_data.append(
                 [
-                    "Payment Distribution",
+                    RowName.PAYMENT_DISTRIBUTION.value,
                     f'=HYPERLINK("{project.calculations_spreadsheet_url}"; "{project.calculations_spreadsheet_url}")',
                 ]
             )
             project_data.append(
                 [
-                    "General Expenses",
+                    RowName.GENERAL_EXPENSES.value,
                     f'=HYPERLINK("{project.report_spreadsheet_url}"; "{project.report_spreadsheet_url}")',
                 ]
             )
@@ -85,7 +88,7 @@ class TimesheetProjectService:
             # Use the service to update the sheet
             self.google_sheets_service.update_sheet_data(
                 spreadsheet_id=spreadsheet_id,
-                sheet_name="Project info",
+                sheet_name=SheetName.PROJECT_INFO.value,
                 data=project_data,
             )
 
@@ -276,7 +279,7 @@ class TimesheetProjectService:
             # 3. Get specialists from the project info sheet
             specialists, existing_timesheets = (
                 self.specialist_service.get_specialists_from_sheet(
-                    spreadsheet_id=project_id, sheet_name="Team"
+                    spreadsheet_id=project_id, sheet_name=SheetName.TEAM.value
                 )
             )
 
@@ -313,7 +316,7 @@ class TimesheetProjectService:
             if new_timesheets_created > 0:
                 self.specialist_service.update_specialists_sheet(
                     spreadsheet_id=project_id,
-                    sheet_name="Team",
+                    sheet_name=SheetName.TEAM.value,
                     specialists=specialists_with_new_timesheets,
                 )
 
@@ -348,14 +351,14 @@ class TimesheetProjectService:
 
             # Get project info sheet
             sheet = self.google_sheets_service.get_sheet_by_name(
-                spreadsheet_id=project_id, sheet_name="Project info"
+                spreadsheet_id=project_id, sheet_name=SheetName.PROJECT_INFO.value
             )
 
             if not sheet:
                 raise Exception("Project info sheet not found")
 
             # Read project data
-            range_name = "Project info!A1:B20"
+            range_name = RangeFormat.PROJECT_INFO.value
             result = (
                 self.google_sheets_service.sheets_service.spreadsheets()
                 .values()
@@ -380,29 +383,29 @@ class TimesheetProjectService:
                 field = row[0].strip()
                 value = row[1].strip()
 
-                if field == "Name":
+                if field == RowName.NAME.value:
                     project_name = value
-                elif field == "Project Folder":
+                elif field == RowName.PROJECT_FOLDER.value:
                     # Extract folder ID from HYPERLINK formula or URL
-                    if "drive/folders/" in value:
+                    if UrlPattern.DRIVE_FOLDERS_SEGMENT in value:
                         drive_folder_id = (
-                            value.split("drive/folders/")[-1]
+                            value.split(UrlPattern.DRIVE_FOLDERS_SEGMENT)[-1]
                             .split('"')[0]
                             .split(";")[0]
                         )
-                elif field == "General Expenses":
+                elif field == RowName.GENERAL_EXPENSES.value:
                     # Extract report ID from HYPERLINK formula or URL
-                    if "spreadsheets/d/" in value:
+                    if UrlPattern.SPREADSHEETS_SEGMENT in value:
                         report_spreadsheet_id = (
-                            value.split("spreadsheets/d/")[-1]
+                            value.split(UrlPattern.SPREADSHEETS_SEGMENT)[-1]
                             .split('"')[0]
                             .split(";")[0]
                         )
-                elif field == "Payment Distribution":
+                elif field == RowName.PAYMENT_DISTRIBUTION.value:
                     # Extract calculations ID from HYPERLINK formula or URL
-                    if "spreadsheets/d/" in value:
+                    if UrlPattern.SPREADSHEETS_SEGMENT in value:
                         calculations_spreadsheet_id = (
-                            value.split("spreadsheets/d/")[-1]
+                            value.split(UrlPattern.SPREADSHEETS_SEGMENT)[-1]
                             .split('"')[0]
                             .split(";")[0]
                         )
@@ -506,7 +509,7 @@ class TimesheetProjectService:
                 raise Exception("Google Sheets service not initialized")
 
             # Find the sheet with the exact name from Google Sheet
-            sheet_name = "Current period"
+            sheet_name = SheetName.CURRENT_PERIOD.value
             sheet = self.google_sheets_service.get_sheet_by_name(
                 spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
             )
@@ -516,7 +519,7 @@ class TimesheetProjectService:
                 return
 
             # Get the current data
-            range_name = f"{sheet_name}!A1:J100"  # Get more rows for analysis
+            range_name = RangeFormat.CURRENT_PERIOD.value.format(sheet_name=sheet_name)
             result = (
                 self.google_sheets_service.sheets_service.spreadsheets()
                 .values()
@@ -533,9 +536,9 @@ class TimesheetProjectService:
             headers = values[0]
             
             # Find indices of required columns
-            specialist_idx = self._find_column_index(headers, "Specialist")
-            role_idx = self._find_column_index(headers, "Specialist Role")
-            hours_worked_idx = self._find_column_index(headers, "Hours Worked")
+            specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
+            role_idx = self._find_column_index(headers, ColumnName.SPECIALIST_ROLE.value)
+            hours_worked_idx = self._find_column_index(headers, ColumnName.HOURS_WORKED.value)
             
             log.info(f"Headers: {headers}")
             log.info(f"Hours Worked column index: {hours_worked_idx}")
@@ -631,8 +634,8 @@ class TimesheetProjectService:
                     log.warning(f"Failed to set hours calculation formula: {str(e)}")
             
             # For General Expenses document
-            rate_idx = self._find_column_index(headers, "Hourly Rate (USD)")
-            total_cost_idx = self._find_column_index(headers, "Total Cost (USD)")
+            rate_idx = self._find_column_index(headers, ColumnName.HOURLY_RATE_USD.value)
+            total_cost_idx = self._find_column_index(headers, ColumnName.TOTAL_COST_USD.value)
             
             if rate_idx is not None:
                 update_data[rate_idx] = str(specialist.external_rate)
@@ -679,7 +682,7 @@ class TimesheetProjectService:
                 raise Exception("Google Sheets service not initialized")
 
             # Find the sheet with the exact name from Google Sheet
-            sheet_name = "Current period"
+            sheet_name = SheetName.CURRENT_PERIOD.value
             sheet = self.google_sheets_service.get_sheet_by_name(
                 spreadsheet_id=spreadsheet_id, sheet_name=sheet_name
             )
@@ -689,7 +692,7 @@ class TimesheetProjectService:
                 return
 
             # Get the current data
-            range_name = f"{sheet_name}!A1:J100"  # Get more rows for analysis
+            range_name = RangeFormat.CURRENT_PERIOD.value.format(sheet_name=sheet_name)
             result = (
                 self.google_sheets_service.sheets_service.spreadsheets()
                 .values()
@@ -706,9 +709,9 @@ class TimesheetProjectService:
             headers = values[0]
             
             # Find indices of required columns
-            specialist_idx = self._find_column_index(headers, "Specialist")
-            role_idx = self._find_column_index(headers, "Specialist Role")
-            hours_worked_idx = self._find_column_index(headers, "Hours Worked")
+            specialist_idx = self._find_column_index(headers, ColumnName.SPECIALIST.value)
+            role_idx = self._find_column_index(headers, ColumnName.SPECIALIST_ROLE.value)
+            hours_worked_idx = self._find_column_index(headers, ColumnName.HOURS_WORKED.value)
             
             log.info(f"Headers: {headers}")
             log.info(f"Hours Worked column index: {hours_worked_idx}")
@@ -804,8 +807,8 @@ class TimesheetProjectService:
                     log.warning(f"Failed to set hours calculation formula: {str(e)}")
             
             # For Payment Distribution document
-            client_rate_idx = self._find_column_index(headers, "Client Hourly Rate (USD)")
-            specialist_rate_idx = self._find_column_index(headers, "Specialist Hourly Rate (USD)")
+            client_rate_idx = self._find_column_index(headers, ColumnName.CLIENT_HOURLY_RATE_USD.value)
+            specialist_rate_idx = self._find_column_index(headers, ColumnName.SPECIALIST_HOURLY_RATE_USD.value)
             
             if client_rate_idx is not None:
                 update_data[client_rate_idx] = str(specialist.external_rate)
@@ -814,9 +817,9 @@ class TimesheetProjectService:
                 update_data[specialist_rate_idx] = str(specialist.internal_rate)
             
             # Add formulas for cost and revenue calculations
-            client_work_cost_idx = self._find_column_index(headers, "Client Work Cost (USD)")
-            specialist_work_cost_idx = self._find_column_index(headers, "Specialist Work Cost (USD)")
-            revenue_idx = self._find_column_index(headers, "Revenue (USD)")
+            client_work_cost_idx = self._find_column_index(headers, ColumnName.CLIENT_WORK_COST_USD.value)
+            specialist_work_cost_idx = self._find_column_index(headers, ColumnName.SPECIALIST_WORK_COST_USD.value)
+            revenue_idx = self._find_column_index(headers, ColumnName.REVENUE_USD.value)
             
             try:
                 # Get formulas from config using the generic get_formula method
@@ -916,7 +919,7 @@ class TimesheetProjectService:
 
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
-                range_name=f"{tab_name}!A1",
+                range_name=RangeFormat.SINGLE_CELL.value.format(sheet_name=tab_name),
                 values=[[import_formula]],
                 value_input_option="USER_ENTERED",
             )
@@ -955,7 +958,7 @@ class TimesheetProjectService:
 
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
-                range_name=f"{tab_name}!A1",
+                range_name=RangeFormat.SINGLE_CELL.value.format(sheet_name=tab_name),
                 values=[[import_formula]],
                 value_input_option="USER_ENTERED",
             )

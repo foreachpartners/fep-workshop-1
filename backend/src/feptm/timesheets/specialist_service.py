@@ -8,7 +8,10 @@ from feptm.core.config import settings
 from feptm.core.log import log
 from feptm.models.specialist import Specialist
 from feptm.services.google_sheets_service import GoogleSheetsService
-from feptm.timesheets.config_service import config_service, FormulaName
+from feptm.timesheets.config_service import (
+    config_service, FormulaName, SheetName, ColumnName, 
+    DateFormat, RangeFormat
+)
 
 
 class SpecialistService:
@@ -19,7 +22,7 @@ class SpecialistService:
         self.google_sheets_service = google_sheets_service
 
     def get_specialists_from_sheet(
-        self, spreadsheet_id: str, sheet_name: str = "Team"
+        self, spreadsheet_id: str, sheet_name: str = SheetName.TEAM.value
     ) -> Tuple[List[Specialist], int]:
         """Extract specialists data from a Google Sheet.
 
@@ -50,7 +53,7 @@ class SpecialistService:
                 return [], 0
 
             # Read the specialists data from the sheet
-            range_name = f"{sheet_name}!A1:Z100"  # Adjust range as needed
+            range_name = RangeFormat.SPECIALIST_DATA.value.format(sheet_name=sheet_name)
             result = (
                 self.google_sheets_service.sheets_service.spreadsheets()
                 .values()
@@ -68,30 +71,30 @@ class SpecialistService:
 
             # Find required column indices
             name_idx = self._find_column_index(
-                headers, ["Name"]
+                headers, [ColumnName.NAME.value]
             )
             role_idx = self._find_column_index(
-                headers, ["Role"]
+                headers, [ColumnName.ROLE.value]
             )
-            project_idx = self._find_column_index(headers, ["Project"])
+            project_idx = self._find_column_index(headers, [ColumnName.PROJECT.value])
             internal_rate_idx = self._find_column_index(
-                headers, ["Internal Rate"]
+                headers, [ColumnName.INTERNAL_RATE.value]
             )
             external_rate_idx = self._find_column_index(
-                headers, ["External Rate"]
+                headers, [ColumnName.EXTERNAL_RATE.value]
             )
-            date_idx = self._find_column_index(headers, ["Date"])
+            date_idx = self._find_column_index(headers, [ColumnName.DATE.value])
             timesheet_idx = self._find_column_index(
-                headers, ["Timesheet"]
+                headers, [ColumnName.TIMESHEET.value]
             )
 
             # Need at least name and role
             if name_idx is None or role_idx is None:
                 missing = []
                 if name_idx is None:
-                    missing.append("Name")
+                    missing.append(ColumnName.NAME.value)
                 if role_idx is None:
-                    missing.append("Role")
+                    missing.append(ColumnName.ROLE.value)
 
                 raise Exception(
                     f"Required columns missing in specialists sheet: {', '.join(missing)}"
@@ -127,7 +130,7 @@ class SpecialistService:
                     date_str = row[date_idx].strip()
                     try:
                         # Use only the format from Google Sheet: "Mar 29, 2025"
-                        date = datetime.strptime(date_str, "%b %d, %Y")
+                        date = datetime.strptime(date_str, DateFormat.SHEET_DATE.value)
                     except Exception:
                         log.warning(f"Invalid date format for {name}: {date_str}")
 
@@ -252,7 +255,7 @@ class SpecialistService:
                 raise Exception(f"Sheet '{sheet_name}' not found")
 
             # Read the specialists data from the sheet
-            range_name = f"{sheet_name}!A1:Z100"  # Adjust range as needed
+            range_name = RangeFormat.SPECIALIST_DATA.value.format(sheet_name=sheet_name)
             result = (
                 self.google_sheets_service.sheets_service.spreadsheets()
                 .values()
@@ -269,22 +272,26 @@ class SpecialistService:
 
             # Find column indices
             name_idx = self._find_column_index(
-                headers, ["Name"]
+                headers, [ColumnName.NAME.value]
             )
             timesheet_idx = self._find_column_index(
-                headers, ["Timesheet"]
+                headers, [ColumnName.TIMESHEET.value]
             )
 
             # If Timesheet column doesn't exist, add it
             if timesheet_idx is None:
                 # Add the column header
                 timesheet_idx = len(headers)
-                headers.append("Timesheet")
+                headers.append(ColumnName.TIMESHEET.value)
 
                 # Update the header row
                 self.google_sheets_service.update_range(
                     spreadsheet_id=spreadsheet_id,
-                    range_name=f"{sheet_name}!A1:{self._column_letter(timesheet_idx)}1",
+                    range_name=RangeFormat.HEADER_ROW.value.format(
+                        sheet_name=sheet_name, 
+                        column=self._column_letter(timesheet_idx),
+                        row=1
+                    ),
                     values=[headers],
                 )
 
