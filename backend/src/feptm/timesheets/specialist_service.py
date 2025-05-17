@@ -338,9 +338,8 @@ class SpecialistService:
             List of rows with formatted data for the report
         """
         # Get IMPORTRANGE formula from config
-        import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
-            specialist_timesheet_id=specialist.timesheet
-        )
+        import_formula = self.google_sheets_service.get_formula("Import specialist timesheet")
+        import_formula = import_formula.replace("SpecialistSpreadsheetID", specialist.timesheet)
         
         # Basic specialist information for report
         return [[specialist.name, specialist.role, import_formula]]

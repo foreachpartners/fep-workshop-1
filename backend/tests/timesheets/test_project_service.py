@@ -55,10 +55,10 @@ def test_update_project_info_sheet(mock_google_sheets_service):
     service.update_project_info_sheet(spreadsheet_id, project)
     
     # Verify Google Sheets service was called
-    mock_google_sheets_service.update_project_sheet.assert_called_once()
+    mock_google_sheets_service.update_sheet_data.assert_called_once()
     
     # Verify call arguments
-    call_args = mock_google_sheets_service.update_project_sheet.call_args[1]
+    call_args = mock_google_sheets_service.update_sheet_data.call_args[1]
     assert call_args["spreadsheet_id"] == spreadsheet_id
     assert call_args["sheet_name"] == "Project info"
     
@@ -74,7 +74,7 @@ def test_update_project_info_sheet(mock_google_sheets_service):
 def test_update_project_info_sheet_error(mock_google_sheets_service):
     """Test error handling when updating project info sheet."""
     # Setup mock to raise exception
-    mock_google_sheets_service.update_project_sheet.side_effect = Exception("API Error")
+    mock_google_sheets_service.update_sheet_data.side_effect = Exception("API Error")
     
     # Setup test data
     spreadsheet_id = "test-spreadsheet-id"
@@ -89,6 +89,9 @@ def test_update_project_info_sheet_error(mock_google_sheets_service):
     
     # Verify exception message
     assert "Failed to update project info sheet" in str(exc_info.value)
+
+    # Verify update_project_info_sheet was called
+    mock_google_sheets_service.update_sheet_data.assert_called_once()
 
 
 def test_create_spreadsheet_from_template(mock_google_sheets_service):
@@ -212,7 +215,7 @@ def test_create_project_success(mock_settings, mock_google_sheets_service):
     mock_google_sheets_service.create_drive_folder.assert_called_once_with("New Project", "parent-folder-id")
     
     # Verify update_project_info_sheet was called
-    mock_google_sheets_service.update_project_sheet.assert_called_once()
+    mock_google_sheets_service.update_sheet_data.assert_called_once()
 
 
 @patch("feptm.timesheets.project_service.settings")

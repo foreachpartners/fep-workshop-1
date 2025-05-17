@@ -190,3 +190,4 @@ GOOGLE_PROJECT_CALCULATIONS_TEMPLATE_ID=your_calculations_template_id
 3. Align terms of reports
 4. Validate that all data required for operations exists
 5. Get rid of string litterals in config
+6. Actualize timestamp in ProjectInfo modified field after any save

@@ -228,7 +228,7 @@ def test_ensure_spreadsheet_from_template(mock_google_sheets_service):
     files_resource.update.assert_called_once()
 
 
-def test_update_project_sheet(mock_google_sheets_service):
+def test_update_sheet_data(mock_google_sheets_service):
     """Test updating a sheet in a spreadsheet."""
     # Mock sheets service responses
     spreadsheets_resource = MagicMock()
@@ -249,7 +249,7 @@ def test_update_project_sheet(mock_google_sheets_service):
     mock_google_sheets_service.update_range = MagicMock()
     mock_google_sheets_service.update_range.return_value = {"updatedRows": 10}
     
-    # Call update_project_sheet
+    # Call update_sheet_data
     spreadsheet_id = "test-spreadsheet-id"
     sheet_name = "Test Sheet"
     data = [
@@ -258,7 +258,7 @@ def test_update_project_sheet(mock_google_sheets_service):
         ["Value 3", "Value 4"]
     ]
     
-    result = mock_google_sheets_service.update_project_sheet(spreadsheet_id, sheet_name, data)
+    result = mock_google_sheets_service.update_sheet_data(spreadsheet_id, sheet_name, data)
     
     # Verify method calls
     mock_google_sheets_service.get_sheet_by_name.assert_called_once_with(spreadsheet_id, sheet_name)
@@ -282,10 +282,10 @@ def test_exception_handling(mock_google_sheets_service):
     # Mock get_sheet_by_name to raise exception
     mock_google_sheets_service.get_sheet_by_name = MagicMock(side_effect=Exception("Sheet not found"))
     
-    # Test update_project_sheet error handling
+    # Test update_sheet_data error handling
     with pytest.raises(Exception) as exc_info:
-        mock_google_sheets_service.update_project_sheet("test-id", "Test Sheet", [["Data"]])
+        mock_google_sheets_service.update_sheet_data("test-id", "Test Sheet", [["Data"]])
     
     # Verify error message contains the original error
-    assert "Failed to update project sheet" in str(exc_info.value)
+    assert "Failed to update sheet" in str(exc_info.value)
     assert "Sheet not found" in str(exc_info.value) 

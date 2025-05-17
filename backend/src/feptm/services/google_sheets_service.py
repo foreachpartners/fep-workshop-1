@@ -486,10 +486,10 @@ class GoogleSheetsService:
         except HttpError as error:
             raise Exception(f"Failed to update range {range_name}: {error}")
 
-    def update_project_sheet(
+    def update_sheet_data(
         self, spreadsheet_id: str, sheet_name: str, data: List[List[Any]]
     ) -> Dict[str, Any]:
-        """Update a project sheet with data.
+        """Update a sheet with data.
 
         Args:
             spreadsheet_id: ID of the spreadsheet
@@ -528,7 +528,7 @@ class GoogleSheetsService:
 
             return cast(Dict[str, Any], response)
         except Exception as error:
-            raise Exception(f"Failed to update project sheet: {error}")
+            raise Exception(f"Failed to update sheet: {error}")
 
     def batch_update(
         self, spreadsheet_id: str, requests: List[Dict[str, Any]]
@@ -617,32 +617,6 @@ class GoogleSheetsService:
         except Exception as e:
             log.error(f"Error getting formula: {str(e)}")
             raise
-            
-    def get_calculate_working_hours_formula(self) -> str:
-        """Get the Calculate working hours formula.
-        
-        Returns:
-            The formula value
-            
-        Raises:
-            Exception: If formula not found
-        """
-        return self.get_formula("Calculate working hours")
-        
-    def get_import_specialist_timesheet_formula(self, specialist_timesheet_id: str) -> str:
-        """Get the Import specialist timesheet formula with specialist's timesheet ID.
-        
-        Args:
-            specialist_timesheet_id: ID of the specialist's timesheet to use in the formula
-            
-        Returns:
-            The formula with the specialist's timesheet ID inserted
-            
-        Raises:
-            Exception: If formula not found
-        """
-        formula = self.get_formula("Import specialist timesheet")
-        return formula.replace("SpecialistSpreadsheetID", specialist_timesheet_id)
 
 
 # Create singleton instance

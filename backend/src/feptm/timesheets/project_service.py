@@ -82,7 +82,7 @@ class TimesheetProjectService:
             )
 
             # Use the service to update the sheet
-            self.google_sheets_service.update_project_sheet(
+            self.google_sheets_service.update_sheet_data(
                 spreadsheet_id=spreadsheet_id,
                 sheet_name="Project info",
                 data=project_data,
@@ -622,7 +622,7 @@ class TimesheetProjectService:
             if hours_worked_idx is not None:
                 try:
                     # Get calculation formula from config
-                    working_hours_formula = self.google_sheets_service.get_calculate_working_hours_formula()
+                    working_hours_formula = self.google_sheets_service.get_formula("Calculate working hours")
                     # Use formula directly without modifications
                     update_data[hours_worked_idx] = working_hours_formula
                     log.info(f"Set working hours formula for {specialist.name}: {working_hours_formula}")
@@ -795,7 +795,7 @@ class TimesheetProjectService:
             if hours_worked_idx is not None:
                 try:
                     # Get calculation formula from config
-                    working_hours_formula = self.google_sheets_service.get_calculate_working_hours_formula()
+                    working_hours_formula = self.google_sheets_service.get_formula("Calculate working hours")
                     # Use formula directly without modifications
                     update_data[hours_worked_idx] = working_hours_formula
                     log.info(f"Set working hours formula for {specialist.name}: {working_hours_formula}")
@@ -909,9 +909,8 @@ class TimesheetProjectService:
             )
             
             # Add IMPORTRANGE formula directly in cell A1
-            import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
-                specialist_timesheet_id=specialist.timesheet
-            )
+            import_formula = self.google_sheets_service.get_formula("Import specialist timesheet")
+            import_formula = import_formula.replace("SpecialistSpreadsheetID", specialist.timesheet)
 
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
@@ -948,9 +947,8 @@ class TimesheetProjectService:
             )
             
             # Add IMPORTRANGE formula directly in cell A1
-            import_formula = self.google_sheets_service.get_import_specialist_timesheet_formula(
-                specialist_timesheet_id=specialist.timesheet
-            )
+            import_formula = self.google_sheets_service.get_formula("Import specialist timesheet")
+            import_formula = import_formula.replace("SpecialistSpreadsheetID", specialist.timesheet)
 
             self.google_sheets_service.update_range(
                 spreadsheet_id=spreadsheet_id,
